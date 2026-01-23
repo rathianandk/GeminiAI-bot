@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, Modality } from "@google/genai";
 import { ModelType, Message, LatLng, GroundingChunk, Shop, MenuItem } from "../types";
 
 const cleanJsonString = (str: string): string => {
@@ -189,6 +189,38 @@ export const processTamilVoiceMenu = async (base64Audio: string): Promise<{ name
     return null;
   } catch (error) {
     console.error("Voice Processing Error:", error);
+    return null;
+  }
+};
+
+/**
+ * Generates an audio commentary explaining landmarks near a vendor's live broadcast.
+ */
+export const generateVoiceCommentary = async (vendor: Shop): Promise<string | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const prompt = `You are a friendly local food guide. A street vendor named ${vendor.name} is broadcasting live from coordinates ${vendor.coords.lat}, ${vendor.coords.lng}. 
+  Briefly explain (15-20 words) where this is by mentioning 2-3 nearby landmarks or famous spots in this part of town. 
+  Make it sound exciting for a hungry explorer. Use a cheerful tone.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Zephyr' },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return base64Audio || null;
+  } catch (error) {
+    console.error("Voice Commentary Error:", error);
     return null;
   }
 };

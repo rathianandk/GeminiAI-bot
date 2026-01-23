@@ -1,8 +1,38 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Map from './components/Map';
-import { askGemini, fetchLegendarySpots, processTamilVoiceMenu } from './services/geminiService';
+import { askGemini, fetchLegendarySpots, processTamilVoiceMenu, generateVoiceCommentary } from './services/geminiService';
 import { Message, ModelType, LatLng, Shop, MenuItem, VendorProfile, VendorStatus, Review, AppNotification, GroundingChunk } from './types';
+
+// PCM Audio Helper Functions
+function decodeBase64(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
 
 const ROLLING_SIRRR_TRAIL: Shop[] = [
   { id: '201', name: 'Eshwari Mess', address: 'Madurai', coords: { lat: 9.9212, lng: 78.0436 }, emoji: '🥘', cuisine: 'Tamil Heritage', rating: 4.8, reviews: [] },
@@ -66,15 +96,16 @@ export default function App() {
     return localStorage.getItem('geo_active_vendor_id');
   });
 
-  const [syncedSpots, setSyncedSpots] = useState<Shop[]>(() => {
-    const saved = localStorage.getItem('geo_synced_spots');
+  const [masterSpotPool, setMasterSpotPool] = useState<Shop[]>(() => {
+    const saved = localStorage.getItem('geo_master_spot_pool');
     return saved ? JSON.parse(saved) : [];
   });
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
-  const [syncBatchSize, setSyncBatchSize] = useState<number>(10);
-  
+  const [syncTarget, setSyncTarget] = useState(10); 
+  const [displayCount, setDisplayCount] = useState(10); 
+
   const [manualReviews, setManualReviews] = useState<Record<string, Review[]>>(() => {
     const saved = localStorage.getItem('geo_manual_reviews');
     return saved ? JSON.parse(saved) : {};
@@ -102,6 +133,11 @@ export default function App() {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+  // Audio Commentary States
+  const [isPlayingCommentary, setIsPlayingCommentary] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
   const stopSyncRef = useRef(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -115,8 +151,8 @@ export default function App() {
   }, [messages]);
 
   useEffect(() => {
-    localStorage.setItem('geo_synced_spots', JSON.stringify(syncedSpots));
-  }, [syncedSpots]);
+    localStorage.setItem('geo_master_spot_pool', JSON.stringify(masterSpotPool));
+  }, [masterSpotPool]);
 
   useEffect(() => {
     localStorage.setItem('geo_manual_reviews', JSON.stringify(manualReviews));
@@ -197,12 +233,13 @@ export default function App() {
   }, [registeredVendors, vendorProfile]);
 
   const allShops = useMemo(() => {
-    const rawList = [...ROLLING_SIRRR_TRAIL, ...syncedSpots, ...vendorShops];
+    const visibleSynced = masterSpotPool.slice(0, displayCount);
+    const rawList = [...ROLLING_SIRRR_TRAIL, ...visibleSynced, ...vendorShops];
     return rawList.map(shop => ({
       ...shop,
       reviews: [...(shop.reviews || []), ...(manualReviews[shop.id] || [])]
     }));
-  }, [vendorShops, syncedSpots, manualReviews]);
+  }, [vendorShops, masterSpotPool, displayCount, manualReviews]);
 
   const selectedShop = useMemo(() => {
     return allShops.find(s => s.id === selectedShopId) || null;
@@ -246,7 +283,7 @@ export default function App() {
     const newNotification: AppNotification = {
       id: `notif-${Date.now()}`,
       title: `${vendorProfile.businessName} is LIVE! 📢`,
-      message: `Join the trail at our exact location. Special menu available for a limited time!`,
+      message: `Join the trail! Landmark Voice Guide available.`,
       timestamp: Date.now(),
       isRead: false,
       shopId: vendorProfile.id,
@@ -255,6 +292,40 @@ export default function App() {
 
     setNotifications(prev => [newNotification, ...prev]);
     showToast("Broadcast link sent to all explorers!", "success");
+  };
+
+  const playCommentary = async (shop: Shop) => {
+    if (currentSourceRef.current) {
+      currentSourceRef.current.stop();
+    }
+
+    setIsPlayingCommentary(true);
+    showToast("Loading Landmark Guide...", "info");
+    
+    const base64 = await generateVoiceCommentary(shop);
+    if (!base64) {
+      setIsPlayingCommentary(false);
+      showToast("Guide unavailable right now.", "error");
+      return;
+    }
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    }
+
+    const audioBytes = decodeBase64(base64);
+    const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+    
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContextRef.current.destination);
+    
+    source.onended = () => {
+      setIsPlayingCommentary(false);
+    };
+
+    currentSourceRef.current = source;
+    source.start(0);
   };
 
   const startVoiceRecording = async () => {
@@ -335,19 +406,44 @@ export default function App() {
 
   const handleSyncWithGemini = async () => {
     if (isSyncing) { stopSyncRef.current = true; return; }
-    setIsSyncing(true); setSyncProgress(0); stopSyncRef.current = false;
-    const result = await fetchLegendarySpots(syncBatchSize);
-    if (result.spots.length === 0) {
-       showToast("Sync failed. Check API key.", 'error');
-       setIsSyncing(false); return;
+    
+    setIsSyncing(true);
+    setSyncProgress(0);
+    stopSyncRef.current = false;
+    
+    const BATCH_SIZE = 8;
+    const totalToFetch = syncTarget;
+    let currentlyFound = 0;
+    const allNewSpots: Shop[] = [];
+
+    showToast(`Starting Deep Mine for ${syncTarget} legends...`, "info");
+
+    while (currentlyFound < totalToFetch && !stopSyncRef.current) {
+      const countToRequest = Math.min(BATCH_SIZE, totalToFetch - currentlyFound);
+      const result = await fetchLegendarySpots(countToRequest);
+      
+      if (result.spots.length === 0) break;
+
+      allNewSpots.push(...result.spots);
+      currentlyFound += result.spots.length;
+      setSyncProgress(currentlyFound);
+
+      setMasterSpotPool(prev => {
+        const existingNames = new Set(prev.map(s => s.name.toLowerCase()));
+        const uniqueNew = result.spots.filter(s => !existingNames.has(s.name.toLowerCase()));
+        return [...prev, ...uniqueNew];
+      });
     }
-    setSyncedSpots(prev => {
-      const existingNames = new Set(prev.map(s => s.name.toLowerCase()));
-      const uniqueNew = result.spots.filter(s => !existingNames.has(s.name.toLowerCase()));
-      return [...prev, ...uniqueNew];
-    });
-    showToast(`Discovered ${result.spots.length} new legends!`);
+
+    if (allNewSpots.length > 0) {
+      showToast(`Mined ${allNewSpots.length} new legends to reservoir!`);
+      setDisplayCount(currentlyFound);
+    } else {
+      showToast("Sync failed or no new spots found.", 'error');
+    }
+    
     setIsSyncing(false);
+    setSyncProgress(0);
   };
 
   const handleRegisterVendor = () => {
@@ -423,6 +519,9 @@ export default function App() {
     setSelectedShopId(shop.id);
     if (!shop.isVendor) {
       handleSend(undefined, `Tell me about ${shop.name} in ${shop.address}. Why is it legendary?`);
+    } else if (shop.status === VendorStatus.ONLINE) {
+      // Play voice guide for live vendors
+      playCommentary(shop);
     }
     if (isMobile) setIsSidebarOpen(false);
   };
@@ -456,6 +555,13 @@ export default function App() {
     }
   };
 
+  const clearReservoir = () => {
+    if (window.confirm("Clear all mined legendary spots from reservoir?")) {
+      setMasterSpotPool([]);
+      showToast("Reservoir cleared.", "info");
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
@@ -469,7 +575,9 @@ export default function App() {
                 {notifications.find(n => !n.isRead)?.emoji}
               </div>
               <div className="flex-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 mb-1">Live Broadcast Alert</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 mb-1 flex items-center gap-1.5">
+                  Live Broadcast Alert <span className="text-white animate-pulse">🔊</span>
+                </p>
                 <p className="text-sm font-black mb-0.5 leading-tight">{notifications.find(n => !n.isRead)?.title}</p>
                 <p className="text-[10px] text-white/70 line-clamp-1">{notifications.find(n => !n.isRead)?.message}</p>
               </div>
@@ -478,7 +586,7 @@ export default function App() {
                   onClick={() => handleViewNotification(notifications.find(n => !n.isRead)!.shopId!, notifications.find(n => !n.isRead)!.id)}
                   className="bg-white text-indigo-700 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl hover:scale-105 transition-all whitespace-nowrap"
                 >
-                  View on Map
+                  Listen & View
                 </button>
                 <button onClick={() => setNotifications(prev => prev.map(n => ({...n, isRead: true})))} className="text-[9px] font-black uppercase opacity-40 hover:opacity-100 text-center">Dismiss</button>
               </div>
@@ -537,31 +645,79 @@ export default function App() {
 
             {customerTab === 'geomind' ? (
               <div className="flex flex-col flex-1 overflow-hidden">
-                <div className="p-4 border-b bg-white shadow-sm shrink-0 flex flex-col gap-3">
-                  <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Filter discovered spots..." className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none" />
-                  <button onClick={handleSyncWithGemini} className={`w-full py-4 rounded-2xl shadow-xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-widest text-[11px] ${isSyncing ? 'bg-red-500' : 'bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500'}`}>
-                    {isSyncing ? 'SCANNING...' : '✨ DEEP SYNC FOOD TRAIL'}
-                  </button>
+                <div className="p-4 border-b bg-white shadow-sm shrink-0 flex flex-col gap-4">
+                  <div className="flex justify-between items-center px-1">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Discovery Depth</p>
+                     <div className="flex gap-1.5">
+                       {[10, 25, 50, 100].map(count => (
+                         <button 
+                            key={count} 
+                            onClick={() => setSyncTarget(count)} 
+                            className={`w-8 h-8 rounded-full text-[9px] font-black flex items-center justify-center transition-all ${syncTarget === count ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400'}`}
+                         >
+                           {count}
+                         </button>
+                       ))}
+                     </div>
+                  </div>
+
+                  <div className="relative group">
+                    <button 
+                      onClick={handleSyncWithGemini} 
+                      className={`w-full py-4 rounded-2xl shadow-xl flex items-center justify-center gap-3 text-white font-black uppercase tracking-widest text-[11px] transition-all overflow-hidden relative ${isSyncing ? 'bg-slate-800' : 'bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 hover:scale-[1.02]'}`}
+                    >
+                      {isSyncing ? (
+                        <div className="z-10 flex items-center gap-2">
+                          <span className="animate-spin text-lg">⚙️</span>
+                          <span>MINING... {syncProgress}/{syncTarget}</span>
+                        </div>
+                      ) : (
+                        <span className="z-10">✨ DEEP MINE LEGENDS</span>
+                      )}
+                      {isSyncing && (
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-indigo-500/30 transition-all duration-500" 
+                          style={{ width: `${(syncProgress / syncTarget) * 100}%` }}
+                        />
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between px-1">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Display Density ({displayCount})</p>
+                       <button onClick={clearReservoir} className="text-[8px] font-black text-red-400 uppercase tracking-tighter hover:text-red-600">Clear Reservoir</button>
+                    </div>
+                    <input 
+                      type="range" min="1" max={Math.max(10, masterSpotPool.length)} 
+                      value={displayCount} onChange={(e) => setDisplayCount(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                  </div>
+
+                  <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Filter active display..." className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold outline-none" />
                 </div>
+
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                   {filteredTrail.map(shop => (
                     <button key={shop.id} onClick={() => selectShop(shop)} className={`w-full text-left p-4 rounded-2xl transition-all border ${selectedShopId === shop.id ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-slate-100 hover:border-slate-300 shadow-sm'}`}>
                       <div className="flex items-center gap-3">
                         <span className="text-xl">{shop.emoji || '🥘'}</span>
-                        <div><div className="text-[12px] font-black text-slate-800">{shop.name}</div><div className="text-[9px] text-slate-400 font-bold uppercase">{shop.cuisine} • {shop.address}</div></div>
+                        <div className="flex-1 overflow-hidden">
+                          <div className="text-[12px] font-black text-slate-800 truncate">{shop.name}</div>
+                          <div className="text-[9px] text-slate-400 font-bold uppercase truncate">{shop.cuisine} • {shop.address}</div>
+                        </div>
                       </div>
                     </button>
                   ))}
                 </div>
+
                 <div className="flex-1 border-t border-slate-200 bg-slate-50/50 flex flex-col overflow-hidden">
                    <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={chatContainerRef}>
                       {messages.map(m => (
                         <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[90%] p-3.5 rounded-2xl shadow-sm border ${m.role === 'user' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white border-slate-200'}`}>
                              {m.isLoading ? <div className="flex gap-1 animate-pulse"><div className="w-2 h-2 bg-slate-300 rounded-full"></div><div className="w-2 h-2 bg-slate-400 rounded-full"></div></div> : <p className="text-[12px] font-semibold">{m.content}</p>}
-                             {m.groundingLinks?.map((link, i) => (
-                               <a key={i} href={link.web?.uri || link.maps?.uri} target="_blank" className="block mt-2 text-[9px] font-black text-indigo-500 uppercase truncate">📍 {link.web?.title || link.maps?.title}</a>
-                             ))}
                           </div>
                         </div>
                       ))}
@@ -619,29 +775,9 @@ export default function App() {
                         
                         <div className="flex flex-col gap-3 mt-6">
                           <button onClick={handleBroadcastLiveLink} className="w-full py-5 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-2xl text-[11px] font-black uppercase shadow-[0_10px_30px_rgba(99,102,241,0.4)] animate-pulse hover:scale-[1.03] transition-all border border-white/20">📢 Notify Location Link</button>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button onClick={getCurrentLocation} className="py-3 bg-white/10 rounded-xl text-[10px] font-black uppercase hover:bg-white/20 transition-all">Update GPS</button>
-                            <button onClick={() => setRegisteredVendors(prev => prev.map(v => v.id === activeVendorId ? {...v, status: VendorStatus.OFFLINE, liveUntil: null} : v))} className="py-3 bg-red-500/20 text-red-400 rounded-xl font-black text-[10px] uppercase hover:bg-red-500/30 transition-all">End Broadcast</button>
-                          </div>
                         </div>
                       </div>
                     ) : <button onClick={() => setIsMarkingSpot(true)} className="w-full py-8 bg-indigo-600 text-white rounded-3xl font-black text-lg uppercase shadow-2xl hover:bg-indigo-700 transition-colors">📍 GO LIVE AT POSITION</button>}
-                  </div>
-                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl">
-                    <div className="flex justify-between items-center mb-6"><h3 className="text-lg font-black">Menu Specials</h3>
-                      <button onMouseDown={startVoiceRecording} onMouseUp={stopVoiceRecording} onTouchStart={startVoiceRecording} onTouchEnd={stopVoiceRecording} className={`px-4 py-2 rounded-2xl border text-[9px] font-black uppercase tracking-widest transition-all ${isRecording ? 'bg-red-100 border-red-500 text-red-600 animate-pulse' : 'bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100'}`}>
-                        {isRecording ? 'Listening (Tamil)...' : '🎙️ Tamil Voice Add'}
-                      </button>
-                    </div>
-                    <div className="space-y-3">
-                      {vendorProfile?.menu.map(item => (
-                        <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border group hover:border-indigo-200">
-                          <div><p className="text-sm font-black">{item.name}</p><p className="text-[10px] font-bold text-slate-400">{item.price}</p></div>
-                          <button onClick={() => handleRemoveMenuItem(item.id)} className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2">✕</button>
-                        </div>
-                      ))}
-                      <button onClick={() => setIsAddingMenuItem(true)} className="w-full py-3 bg-slate-100 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-black text-[10px] uppercase hover:bg-white">+ Manual Add Item</button>
-                    </div>
                   </div>
                 </div>
               )}
@@ -656,14 +792,32 @@ export default function App() {
         
         {selectedShop && (
           <div className="absolute bottom-0 md:bottom-10 left-0 md:left-1/2 md:-translate-x-1/2 z-[500] w-full md:w-[500px] pointer-events-none p-4">
-            <div className="bg-slate-900/95 backdrop-blur-3xl p-6 rounded-[2.5rem] shadow-2xl border border-white/10 pointer-events-auto flex flex-col max-h-[75vh] animate-in slide-in-from-bottom-5 duration-500">
+            <div className="bg-slate-900/95 backdrop-blur-3xl p-6 rounded-[2.5rem] shadow-2xl border border-white/10 pointer-events-auto flex flex-col max-h-[75vh] animate-in slide-in-from-bottom-5 duration-500 relative">
+              
+              {/* Voice Guide Indicator */}
+              {isPlayingCommentary && (
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-full shadow-2xl animate-bounce">
+                  <span className="text-xs font-black uppercase tracking-widest">Neural Guide Speaking</span>
+                  <div className="flex gap-1">
+                    <div className="w-1 h-3 bg-white/50 animate-pulse"></div>
+                    <div className="w-1 h-3 bg-white animate-pulse delay-75"></div>
+                    <div className="w-1 h-3 bg-white/50 animate-pulse delay-150"></div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-start mb-6 shrink-0">
                 <div className="flex items-center gap-4"><span className="text-5xl">{selectedShop.emoji}</span><div className="flex-1"><h3 className="text-xl font-black text-white">{selectedShop.name}</h3><div className="flex items-center gap-2"><span className="text-indigo-400 text-xs">★</span><span className="text-white font-black">{selectedShop.rating}</span><span className="text-slate-500 font-bold text-xs uppercase ml-2">• {selectedShop.cuisine}</span></div></div></div>
                 <button onClick={() => setSelectedShopId(null)} className="text-white/50 p-2 hover:text-white transition-colors">✕</button>
               </div>
               <div className="space-y-5 overflow-y-auto custom-scrollbar pr-2 pb-2 text-white">
                 <p className="text-sm">{selectedShop.address}</p>
-                {selectedShop.isVendor && <p className="text-[10px] font-black text-emerald-400 uppercase">Live Street Presence Verified</p>}
+                {selectedShop.isVendor && (
+                  <div className="flex items-center gap-3">
+                    <p className="text-[10px] font-black text-emerald-400 uppercase">Live Street Presence Verified</p>
+                    <button onClick={() => playCommentary(selectedShop)} className="text-[9px] font-black uppercase text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 hover:bg-indigo-500/30 transition-all">Replay Guide 🔊</button>
+                  </div>
+                )}
                 {selectedShop.menu && selectedShop.menu.length > 0 && (
                   <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
                     <p className="text-[10px] font-black text-indigo-400 uppercase mb-3 tracking-widest">Store Specials</p>
@@ -673,7 +827,7 @@ export default function App() {
                   </div>
                 )}
                 <div className="pt-6 border-t border-white/10">
-                  <div className="flex justify-between items-center mb-4"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Buzz</p><button onClick={() => setIsAddingReview(true)} className="text-[9px] font-black text-indigo-400 uppercase bg-indigo-500/20 px-4 py-2 rounded-full border border-indigo-500/30 hover:bg-indigo-500/30 transition-all">Add Review</button></div>
+                  <div className="flex justify-between items-center mb-4"><p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Buzz</p></div>
                   <div className="space-y-4">{selectedShop.reviews?.map(rev => (
                     <div key={rev.id} className="bg-white/5 p-4 rounded-2xl border border-white/5"><div className="flex justify-between items-center mb-2"><span className="text-white text-xs font-black">{rev.userName}</span><span className="text-indigo-400 text-[10px]">{'★'.repeat(rev.rating)}</span></div><p className="text-slate-300 text-[11px] leading-relaxed">{rev.text}</p></div>
                   ))}</div>
@@ -705,20 +859,6 @@ export default function App() {
         </div>
       )}
 
-      {isAddingMenuItem && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[2002] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
-            <div className="bg-indigo-600 p-8 text-white text-center"><h2 className="text-xl font-black">New Menu Item</h2></div>
-            <div className="p-8 space-y-4">
-              <input value={newMenuName} onChange={e => setNewMenuName(e.target.value)} placeholder="Dish Name" className="w-full p-4 rounded-xl bg-slate-50 border text-sm font-bold outline-none" />
-              <input value={newMenuPrice} onChange={e => setNewMenuPrice(e.target.value)} placeholder="Price (e.g. 150)" className="w-full p-4 rounded-xl bg-slate-50 border text-sm font-bold outline-none" />
-              <button onClick={handleAddMenuItem} className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-sm uppercase shadow-xl mt-4">Add to Menu</button>
-              <button onClick={() => setIsAddingMenuItem(false)} className="w-full py-2 text-slate-400 font-black text-[10px] uppercase text-center">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isMarkingSpot && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[2001] flex items-center justify-center p-4">
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
@@ -731,66 +871,11 @@ export default function App() {
                   <div className="bg-slate-50 p-6 rounded-3xl border border-indigo-100">
                     <p className="text-[10px] font-black text-indigo-600 uppercase text-center mb-4 tracking-widest">LIVE BROADCAST COORDINATES</p>
                     <div className="flex justify-between text-xs font-black text-slate-600 px-4 mb-4"><div className="flex flex-col items-center"><span>LAT</span><span className="text-indigo-600">{currentLoc?.lat.toFixed(6)}</span></div><div className="flex flex-col items-center"><span>LNG</span><span className="text-indigo-600">{currentLoc?.lng.toFixed(6)}</span></div></div>
-                    <div className="flex justify-center items-center gap-2 border-t pt-4">
-                      <input value={closeHours} onChange={e => setCloseHours(e.target.value)} placeholder="HH" className="w-14 p-3 rounded-xl text-center font-black text-lg border outline-none" />
-                      <span className="font-black text-indigo-300">:</span>
-                      <input value={closeMinutes} onChange={e => setCloseMinutes(e.target.value)} placeholder="MM" className="w-14 p-3 rounded-xl text-center font-black text-lg border outline-none" />
-                      <div className="flex bg-indigo-200/30 p-1 rounded-xl">
-                        <button onClick={() => setAmpm('AM')} className={`px-2 py-1 rounded-lg text-[10px] font-black ${ampm === 'AM' ? 'bg-white text-indigo-600 shadow-sm' : 'text-indigo-400'}`}>AM</button>
-                        <button onClick={() => setAmpm('PM')} className={`px-2 py-1 rounded-lg text-[10px] font-black ${ampm === 'PM' ? 'bg-white text-indigo-600 shadow-sm' : 'text-indigo-400'}`}>PM</button>
-                      </div>
-                    </div>
                   </div>
                   <button onClick={handleGoLive} className="w-full py-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-[2rem] font-black text-lg shadow-2xl hover:scale-[1.02] transition-all">START BROADCAST</button>
                 </div>
               )}
               <button onClick={() => setIsMarkingSpot(false)} className="w-full py-2 text-slate-400 font-black text-[10px] uppercase text-center">Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isOrdering && selectedShop && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-2xl z-[2010] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-            <div className="bg-emerald-600 p-8 text-white flex justify-between items-center shrink-0">
-               <div className="flex items-center gap-4"><span className="text-4xl">{selectedShop.emoji}</span><div><h2 className="text-xl font-black uppercase tracking-widest">{selectedShop.name}</h2><p className="text-[10px] font-bold text-white/50 uppercase">Secure Ordering Portal</p></div></div>
-               <button onClick={() => setIsOrdering(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20">✕</button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedShop.menu?.map(item => (
-                    <div key={item.id} className="bg-slate-50 p-5 rounded-3xl border border-slate-100 flex justify-between items-center">
-                       <div className="flex-1 overflow-hidden pr-2"><p className="text-sm font-black text-slate-800 truncate">{item.name}</p><p className="text-xs font-black text-emerald-600">{item.price}</p></div>
-                       <div className="flex items-center bg-white rounded-2xl p-1 shadow-sm border border-slate-100 shrink-0">
-                          <button onClick={() => updateCart(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-emerald-600 font-black">-</button>
-                          <span className="w-8 text-center text-xs font-black">{cart[item.id] || 0}</span>
-                          <button onClick={() => updateCart(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-emerald-600 font-black">+</button>
-                       </div>
-                    </div>
-                  ))}
-               </div>
-            </div>
-            <div className="p-8 bg-slate-50 border-t shrink-0">
-               <div className="flex justify-between items-center mb-6"><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total</p><p className="text-3xl font-black text-slate-900">₹{totalPrice}</p></div></div>
-               <button onClick={handlePlaceOrder} disabled={isPlacingOrder || Object.keys(cart).length === 0} className={`w-full py-6 rounded-3xl text-white font-black text-xs uppercase tracking-[0.2em] shadow-2xl transition-all ${Object.keys(cart).length > 0 ? 'bg-emerald-600' : 'bg-slate-300'}`}>
-                 {isPlacingOrder ? 'PROCESSING...' : 'CONFIRM ORDER'}
-               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isAddingReview && (
-        <div className="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[2005] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
-            <div className="bg-indigo-600 p-10 text-white text-center"><span className="text-5xl mb-4 block">💬</span><h2 className="text-xl font-black uppercase tracking-[0.2em]">Post a Buzz</h2></div>
-            <div className="p-10 space-y-6">
-              <input value={revName} onChange={e => setRevName(e.target.value)} placeholder="Explorer Name" className="w-full p-4 rounded-2xl bg-slate-50 border text-sm font-bold outline-none" />
-              <div className="flex justify-center gap-1.5">{[1,2,3,4,5].map(star => (<button key={star} onClick={() => setRevRating(star)} className={`text-4xl ${revRating >= star ? 'text-indigo-600' : 'text-slate-100'}`}>★</button>))}</div>
-              <textarea value={revText} onChange={e => setRevText(e.target.value)} placeholder="Review this spot..." className="w-full p-5 rounded-3xl bg-slate-50 border text-sm font-bold h-36 outline-none resize-none" />
-              <button onClick={handleAddReview} className="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl">Publish</button>
-              <button onClick={() => setIsAddingReview(false)} className="w-full py-2 text-slate-400 font-black text-[9px] uppercase tracking-widest">Cancel</button>
             </div>
           </div>
         </div>
