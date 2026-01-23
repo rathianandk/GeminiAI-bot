@@ -2,6 +2,7 @@
   "name": "GeoMind - AI Map Explorer",
   "description": "An interactive map-based chatbot that combines Gemini's reasoning with real-time Google Maps and Search grounding to explore the world.",
   "requestFramePermissions": [
-    "geolocation"
+    "geolocation",
+    "microphone"
   ]
 }

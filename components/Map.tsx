@@ -46,6 +46,11 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         overflow: visible !important;
       }
 
+      .custom-marker-container.is-offline {
+        opacity: 0.6;
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15)) grayscale(0.8);
+      }
+
       .marker-truck-badge {
         width: 44px;
         height: 44px;
@@ -84,6 +89,11 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         letter-spacing: 0.03em;
         z-index: 1;
         pointer-events: none;
+      }
+
+      .is-offline .marker-label {
+        border-color: #94A3B8;
+        color: #64748B;
       }
 
       /* Hover States */
@@ -144,13 +154,16 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
     shopMarkersGroupRef.current.clearLayers();
 
     shops.forEach(shop => {
-      const isLive = shop.isVendor && shop.status === VendorStatus.ONLINE;
+      const isOnline = shop.isVendor && shop.status === VendorStatus.ONLINE;
+      const isVendorOffline = shop.isVendor && shop.status === VendorStatus.OFFLINE;
       const isAIsync = shop.id.startsWith('sync');
       
       // Distinct Colors for the Truck Icon
       let truckColor = '#3B82F6'; // Standard blue
-      if (isLive) {
+      if (isOnline) {
         truckColor = '#10B981'; // Live Green
+      } else if (isVendorOffline) {
+        truckColor = '#94A3B8'; // Offline Vendor Gray
       } else if (shop.isVendor) {
         truckColor = '#6366F1'; // Registered Vendor Indigo
       } else if (isAIsync) {
@@ -165,7 +178,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
       `;
 
       const markerHtml = `
-        <div class="custom-marker-container">
+        <div class="custom-marker-container ${isVendorOffline ? 'is-offline' : ''}">
           <div class="marker-truck-badge" style="background: ${truckColor};">
             ${truckSvg}
             <span style="position: absolute; top: -5px; right: -5px; font-size: 14px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));">${shop.emoji || ''}</span>
@@ -183,7 +196,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
           iconSize: [120, 80],
           iconAnchor: [60, 60]
         }),
-        zIndexOffset: isLive ? 500 : (isAIsync ? 300 : 100)
+        zIndexOffset: isOnline ? 500 : (isAIsync ? 300 : 100)
       })
       .on('click', () => onShopClick(shop));
       

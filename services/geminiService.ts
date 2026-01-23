@@ -1,10 +1,7 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { ModelType, Message, LatLng, GroundingChunk, Shop } from "../types";
+import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { ModelType, Message, LatLng, GroundingChunk, Shop, MenuItem } from "../types";
 
-/**
- * Helper to strip markdown code blocks from JSON strings.
- */
 const cleanJsonString = (str: string): string => {
   return str.replace(/```json/g, '').replace(/```/g, '').trim();
 };
@@ -15,7 +12,6 @@ export const askGemini = async (
   location?: LatLng,
   featuredShopsContext?: string
 ): Promise<Partial<Message>> => {
-  // Initialize AI client inside the function to ensure current context/key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
@@ -70,10 +66,6 @@ export const askGemini = async (
   }
 };
 
-/**
- * Specifically uses Gemini 3 Pro and Google Search to fetch legendary food spots.
- * Optimizes the prompt to focus on actionable extraction and handles JSON cleaning.
- */
 export const fetchLegendarySpots = async (count: number = 10): Promise<{ spots: Shop[], sources: GroundingChunk[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
@@ -150,5 +142,53 @@ export const fetchLegendarySpots = async (count: number = 10): Promise<{ spots: 
   } catch (error) {
     console.error("Deep Sync Error:", error);
     return { spots: [], sources: [] };
+  }
+};
+
+/**
+ * Uses Native Audio to process Tamil voice commands for adding menu items.
+ */
+export const processTamilVoiceMenu = async (base64Audio: string): Promise<{ name: string; price: string } | null> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  const addMenuItemFunction: FunctionDeclaration = {
+    name: "add_menu_item",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Extract the dish name and price from the user's speech.",
+      properties: {
+        name: { type: Type.STRING, description: "The name of the dish in English or Transliterated Tamil." },
+        price: { type: Type.STRING, description: "The price with currency symbol, e.g. ₹50." }
+      },
+      required: ["name", "price"]
+    }
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType: "audio/wav", data: base64Audio } },
+            { text: "The user is a food vendor speaking in Tamil. They are trying to add a dish to their menu. Extract the dish name and the price. Use the add_menu_item function." }
+          ]
+        }
+      ],
+      config: {
+        tools: [{ functionDeclarations: [addMenuItemFunction] }]
+      }
+    });
+
+    const calls = response.functionCalls;
+    if (calls && calls.length > 0) {
+      const args = calls[0].args as any;
+      return { name: args.name, price: args.price };
+    }
+    return null;
+  } catch (error) {
+    console.error("Voice Processing Error:", error);
+    return null;
   }
 };
