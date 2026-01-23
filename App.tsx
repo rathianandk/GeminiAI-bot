@@ -40,6 +40,8 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const [activeToast, setActiveToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -71,7 +73,6 @@ export default function App() {
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
-  const [isFetchingAI, setIsFetchingAI] = useState(false);
   const [syncBatchSize, setSyncBatchSize] = useState<number>(10);
   
   const [manualReviews, setManualReviews] = useState<Record<string, Review[]>>(() => {
@@ -236,6 +237,26 @@ export default function App() {
     }
   };
 
+  const handleBroadcastLiveLink = () => {
+    if (!vendorProfile || vendorProfile.status !== VendorStatus.ONLINE) {
+      showToast("Go Live first to broadcast your link!", "error");
+      return;
+    }
+    
+    const newNotification: AppNotification = {
+      id: `notif-${Date.now()}`,
+      title: `${vendorProfile.businessName} is LIVE! 📢`,
+      message: `Join the trail at our exact location. Special menu available for a limited time!`,
+      timestamp: Date.now(),
+      isRead: false,
+      shopId: vendorProfile.id,
+      emoji: vendorProfile.emoji || '🚚'
+    };
+
+    setNotifications(prev => [newNotification, ...prev]);
+    showToast("Broadcast link sent to all explorers!", "success");
+  };
+
   const startVoiceRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -314,9 +335,8 @@ export default function App() {
 
   const handleSyncWithGemini = async () => {
     if (isSyncing) { stopSyncRef.current = true; return; }
-    setIsSyncing(true); setIsFetchingAI(true); setSyncProgress(0); stopSyncRef.current = false;
+    setIsSyncing(true); setSyncProgress(0); stopSyncRef.current = false;
     const result = await fetchLegendarySpots(syncBatchSize);
-    setIsFetchingAI(false);
     if (result.spots.length === 0) {
        showToast("Sync failed. Check API key.", 'error');
        setIsSyncing(false); return;
@@ -427,8 +447,46 @@ export default function App() {
     showToast("Order Placed! The vendor is preparing your food.");
   };
 
+  const handleViewNotification = (shopId: string, notifId: string) => {
+    const shop = allShops.find(s => s.id === shopId);
+    if (shop) {
+      selectShop(shop);
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+      setShowNotificationCenter(false);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   return (
     <div className="flex h-screen w-screen bg-slate-100 font-sans overflow-hidden relative text-slate-900">
+      {/* Global High-Visibility Notification Banner for Explorers */}
+      {userMode === 'customer' && notifications.some(n => !n.isRead) && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[2005] w-full max-w-lg px-6">
+          <div className="bg-gradient-to-br from-indigo-700 via-purple-700 to-indigo-900 p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.4)] border border-white/20 text-white animate-in slide-in-from-top-20 zoom-in-95 duration-500">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-4xl shadow-inner animate-bounce">
+                {notifications.find(n => !n.isRead)?.emoji}
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 mb-1">Live Broadcast Alert</p>
+                <p className="text-sm font-black mb-0.5 leading-tight">{notifications.find(n => !n.isRead)?.title}</p>
+                <p className="text-[10px] text-white/70 line-clamp-1">{notifications.find(n => !n.isRead)?.message}</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => handleViewNotification(notifications.find(n => !n.isRead)!.shopId!, notifications.find(n => !n.isRead)!.id)}
+                  className="bg-white text-indigo-700 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-xl hover:scale-105 transition-all whitespace-nowrap"
+                >
+                  View on Map
+                </button>
+                <button onClick={() => setNotifications(prev => prev.map(n => ({...n, isRead: true})))} className="text-[9px] font-black uppercase opacity-40 hover:opacity-100 text-center">Dismiss</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeToast && (
         <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[3000] px-6 py-3 rounded-full shadow-2xl text-white text-xs font-black uppercase tracking-widest animate-in slide-in-from-bottom-5 duration-300 ${activeToast.type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
           {activeToast.message}
@@ -446,13 +504,36 @@ export default function App() {
             <div className="bg-indigo-900 text-white pt-5 shadow-lg shrink-0 z-10">
               <div className="px-5 pb-4 flex justify-between items-center">
                 <h1 className="text-xl font-black tracking-tight">🍲 GEOMIND</h1>
-                <button onClick={() => setIsSidebarOpen(false)} className="bg-white/10 p-2 rounded-full text-white md:hidden">✕</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setShowNotificationCenter(!showNotificationCenter)} className="relative bg-white/10 p-2 rounded-full hover:bg-white/20 transition-colors">
+                    <span>🔔</span>
+                    {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] w-4 h-4 rounded-full flex items-center justify-center font-black animate-pulse">{unreadCount}</span>}
+                  </button>
+                  <button onClick={() => setIsSidebarOpen(false)} className="bg-white/10 p-2 rounded-full text-white md:hidden">✕</button>
+                </div>
               </div>
               <div className="flex border-t border-white/10">
                 <button onClick={() => setCustomerTab('geomind')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest ${customerTab === 'geomind' ? 'bg-white/10 border-b-2 border-white' : 'text-white/40'}`}>GeoMind AI</button>
                 <button onClick={() => setCustomerTab('live')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest ${customerTab === 'live' ? 'bg-white/10 border-b-2 border-white' : 'text-white/40'}`}>Live Now</button>
               </div>
             </div>
+
+            {showNotificationCenter && (
+              <div className="absolute top-24 right-4 left-4 z-50 bg-white rounded-3xl shadow-2xl border border-slate-200 max-h-[60%] flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="p-4 border-b flex justify-between items-center"><h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Broadcast History</h3><button onClick={() => setShowNotificationCenter(false)} className="text-slate-300 hover:text-slate-900">✕</button></div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  {notifications.length === 0 && <p className="text-center py-10 text-[10px] text-slate-400 italic font-black uppercase">No broadcasts yet</p>}
+                  {notifications.map(n => (
+                    <button key={n.id} onClick={() => handleViewNotification(n.shopId!, n.id)} className={`w-full text-left p-4 rounded-2xl border transition-all ${n.isRead ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-indigo-50 border-indigo-100 shadow-sm'}`}>
+                      <div className="flex gap-3 items-center">
+                        <span className="text-2xl">{n.emoji}</span>
+                        <div><p className="text-xs font-black text-slate-800">{n.title}</p><p className="text-[10px] text-slate-500 line-clamp-1">{n.message}</p></div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {customerTab === 'geomind' ? (
               <div className="flex flex-col flex-1 overflow-hidden">
@@ -528,12 +609,21 @@ export default function App() {
                   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6">
                     <div className="flex items-center gap-4"><span className="text-5xl">{vendorProfile?.emoji}</span><h2 className="text-2xl font-black">{vendorProfile?.businessName}</h2></div>
                     {vendorProfile?.status === VendorStatus.ONLINE ? (
-                      <div className="bg-indigo-900 text-white p-8 rounded-3xl text-center">
+                      <div className="bg-indigo-900 text-white p-8 rounded-3xl text-center shadow-2xl border border-white/10">
                         <p className="text-[10px] font-black uppercase opacity-50 mb-2">Live Now (Until?)</p>
                         <span className="text-4xl font-mono font-black">{timeLeftDisplay}</span>
-                        <p className="mt-4 text-[11px] font-black text-emerald-400">Broadcasting: {vendorProfile?.lastLocation.lat.toFixed(5)}, {vendorProfile?.lastLocation.lng.toFixed(5)}</p>
-                        <button onClick={getCurrentLocation} className="mt-4 w-full py-2 bg-white/10 rounded-xl text-[10px] font-black uppercase hover:bg-white/20">Update Live Location</button>
-                        <button onClick={() => setRegisteredVendors(prev => prev.map(v => v.id === activeVendorId ? {...v, status: VendorStatus.OFFLINE, liveUntil: null} : v))} className="w-full mt-4 py-3 bg-red-500/20 text-red-500 rounded-xl font-black text-[10px] uppercase">End Broadcast</button>
+                        <div className="mt-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Broadcasting From</p>
+                           <p className="text-xs font-mono font-bold text-emerald-400">{vendorProfile?.lastLocation.lat.toFixed(6)}, {vendorProfile?.lastLocation.lng.toFixed(6)}</p>
+                        </div>
+                        
+                        <div className="flex flex-col gap-3 mt-6">
+                          <button onClick={handleBroadcastLiveLink} className="w-full py-5 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-2xl text-[11px] font-black uppercase shadow-[0_10px_30px_rgba(99,102,241,0.4)] animate-pulse hover:scale-[1.03] transition-all border border-white/20">📢 Notify Location Link</button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button onClick={getCurrentLocation} className="py-3 bg-white/10 rounded-xl text-[10px] font-black uppercase hover:bg-white/20 transition-all">Update GPS</button>
+                            <button onClick={() => setRegisteredVendors(prev => prev.map(v => v.id === activeVendorId ? {...v, status: VendorStatus.OFFLINE, liveUntil: null} : v))} className="py-3 bg-red-500/20 text-red-400 rounded-xl font-black text-[10px] uppercase hover:bg-red-500/30 transition-all">End Broadcast</button>
+                          </div>
+                        </div>
                       </div>
                     ) : <button onClick={() => setIsMarkingSpot(true)} className="w-full py-8 bg-indigo-600 text-white rounded-3xl font-black text-lg uppercase shadow-2xl hover:bg-indigo-700 transition-colors">📍 GO LIVE AT POSITION</button>}
                   </div>

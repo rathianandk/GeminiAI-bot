@@ -146,7 +146,7 @@ export const fetchLegendarySpots = async (count: number = 10): Promise<{ spots: 
 };
 
 /**
- * Uses Native Audio to process Tamil voice commands for adding menu items.
+ * Uses gemini-2.5-flash to process Tamil voice commands for adding menu items.
  */
 export const processTamilVoiceMenu = async (base64Audio: string): Promise<{ name: string; price: string } | null> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -166,7 +166,7 @@ export const processTamilVoiceMenu = async (base64Audio: string): Promise<{ name
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-native-audio-preview-12-2025",
+      model: "gemini-2.5-flash",
       contents: [
         {
           role: "user",
