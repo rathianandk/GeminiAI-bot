@@ -14,6 +14,11 @@ export interface GroundingChunk {
   maps?: { uri: string; title: string };
 }
 
+export interface MenuItem {
+  name: string;
+  price: number;
+}
+
 export interface Shop {
   id: string;
   name: string;
@@ -26,6 +31,7 @@ export interface Shop {
   address?: string;
   sourceUrl?: string;
   landmarks?: string[];
+  menu?: MenuItem[];
 }
 
 export interface VendorProfile {
@@ -35,6 +41,7 @@ export interface VendorProfile {
   cuisine: string;
   description: string;
   lastLocation?: LatLng;
+  menu: MenuItem[];
 }
 
 export interface AgentLog {

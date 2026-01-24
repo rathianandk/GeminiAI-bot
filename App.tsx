@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Map from './components/Map';
 import { discoveryAgent, spatialAlertAgent, summarizeInTamil, generateVendorBio } from './services/geminiService';
-import { Shop, LatLng, AgentLog, VendorStatus, VendorProfile } from './types';
+import { Shop, LatLng, AgentLog, VendorStatus, VendorProfile, MenuItem } from './types';
 
 // Seed Data for "Discovered" Catalog (Legendary Rolling Sirrr / Chennai spots)
 const SEED_SHOPS: Shop[] = [
@@ -14,7 +14,7 @@ const SEED_SHOPS: Shop[] = [
     emoji: '🥘', 
     cuisine: 'Bajjis & Snacks', 
     address: '1, Ponnambala Vadhyar St, Mylapore, Chennai', 
-    description: 'மச்சான், மயிலாப்பூர் ஜன்னல் கடையில சுட சுட பஜ்ஜி சாப்பிட்டு இருக்கியா, அந்த ஸ்பைசி சட்னியோட சாப்பிட்டு பார்த்தா வேற லெவல்ல இருக்கும்! அந்த ஜன்னல் வழியா வாங்கி சாப்பிடுற வைபே தனி தான், மிஸ் பண்ணாம ட்ரை பண்ணு நண்பா!' 
+    description: 'மச்சான், மயிலாப்பூர் ஜன்னல் கடையில சுட சுட பஜ்ஜி சாப்பிட்டு இருக்கியா, அந்த ஸ்பைசி சட்னியோட சாப்பிட்டு பார்த்தா வேற லெவல்ல இருக்கும்! அந்த ஜன்னல் வழியா வாங்கி சாப்பிடுற வாங்கி சாப்பிடுற வைபே தனி தான், மிஸ் பண்ணாம ட்ரை பண்ணு நண்பா!' 
   },
   { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Rose Milk', address: '27, South Mada Street, Mylapore, Chennai', description: 'Iconic spot for the best Rose Milk in the city since decades.' },
   { id: 'seed-3', name: 'Burmese Atho Stall', coords: { lat: 13.0900, lng: 80.2900 }, isVendor: false, emoji: '🍜', cuisine: 'Burmese Atho', address: 'Beach Station Road, Parrys, North Chennai', description: 'Signature North Chennai Atho and Mohinga. A must-visit for street food lovers.' },
@@ -29,7 +29,8 @@ const SEED_PROFILES: VendorProfile[] = [
     emoji: '🍗',
     cuisine: 'Bhai Biryani',
     description: 'Legacy wood-fired biryani from the heart of Triplicane. Vera level taste machan!',
-    lastLocation: { lat: 13.0585, lng: 80.2730 }
+    lastLocation: { lat: 13.0585, lng: 80.2730 },
+    menu: [{ name: 'Mutton Biryani', price: 250 }, { name: 'Chicken 65', price: 120 }, { name: 'Bread Halwa', price: 40 }]
   },
   {
     id: 'profile-2',
@@ -37,7 +38,8 @@ const SEED_PROFILES: VendorProfile[] = [
     emoji: '🥛',
     cuisine: 'Thick Lassi',
     description: 'The thickest malai lassi in Chennai. One glass and you are done for the day!',
-    lastLocation: { lat: 13.0940, lng: 80.2825 }
+    lastLocation: { lat: 13.0940, lng: 80.2825 },
+    menu: [{ name: 'Kesar Lassi', price: 80 }, { name: 'Sweet Lassi', price: 60 }, { name: 'Dry Fruit Lassi', price: 110 }]
   },
   {
     id: 'profile-3',
@@ -45,7 +47,8 @@ const SEED_PROFILES: VendorProfile[] = [
     emoji: '🍜',
     cuisine: 'Burmese Street Food',
     description: 'Hot Atho and Bejo soup served daily. Authentic North Chennai vibes.',
-    lastLocation: { lat: 13.0910, lng: 80.2905 }
+    lastLocation: { lat: 13.0910, lng: 80.2905 },
+    menu: [{ name: 'Egg Atho', price: 90 }, { name: 'Chicken Atho', price: 110 }, { name: 'Bejo Soup', price: 30 }]
   },
   {
     id: 'profile-4',
@@ -53,7 +56,8 @@ const SEED_PROFILES: VendorProfile[] = [
     emoji: '🥪',
     cuisine: 'Cheese Sandwiches',
     description: 'Famous for the double-cheese bread omelette and chili cheese toast.',
-    lastLocation: { lat: 13.0385, lng: 80.2525 }
+    lastLocation: { lat: 13.0385, lng: 80.2525 },
+    menu: [{ name: 'Cheese Bread Omelette', price: 70 }, { name: 'Chili Cheese Toast', price: 90 }, { name: 'Chocolate Sandwich', price: 80 }]
   },
   {
     id: 'profile-5',
@@ -61,9 +65,19 @@ const SEED_PROFILES: VendorProfile[] = [
     emoji: '🌽',
     cuisine: 'Roasted Corn',
     description: 'Perfectly roasted masala corn. The ultimate shopping fuel.',
-    lastLocation: { lat: 13.0415, lng: 80.2330 }
+    lastLocation: { lat: 13.0415, lng: 80.2330 },
+    menu: [{ name: 'Butter Masala Corn', price: 40 }, { name: 'Lemon Chili Corn', price: 35 }]
   }
 ];
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  emoji: string;
+  coords: LatLng;
+  shopId: string;
+}
 
 // Audio Helpers
 function decodeBase64(b64: string) {
@@ -95,6 +109,7 @@ export default function App() {
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor'>('explorer');
   const [explorerTab, setExplorerTab] = useState<'logs' | 'discovered'>('discovered');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Vendor Specific State
   const [myProfiles, setMyProfiles] = useState<VendorProfile[]>(() => {
@@ -103,7 +118,8 @@ export default function App() {
   });
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-  const [regForm, setRegForm] = useState({ name: '', cuisine: '', emoji: '🥘', description: '' });
+  const [regForm, setRegForm] = useState({ name: '', cuisine: '', emoji: '🥘', description: '', menu: [] as MenuItem[] });
+  const [newItem, setNewItem] = useState({ name: '', price: '' });
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
 
   useEffect(() => {
@@ -119,7 +135,8 @@ export default function App() {
       emoji: p.emoji,
       cuisine: p.cuisine,
       address: 'Registered Static Node',
-      description: p.description
+      description: p.description,
+      menu: p.menu
     }));
 
     setShops(prev => {
@@ -174,12 +191,30 @@ export default function App() {
       emoji: regForm.emoji,
       cuisine: regForm.cuisine,
       description: regForm.description || `A legendary ${regForm.cuisine} spot registered on GeoMind.`,
-      lastLocation: location
+      lastLocation: location,
+      menu: regForm.menu
     };
     setMyProfiles(prev => [...prev, newProfile]);
-    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '' });
+    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', menu: [] });
+    setNewItem({ name: '', price: '' });
     setIsRegistering(false);
     setActiveProfileId(newProfile.id);
+  };
+
+  const addMenuItem = () => {
+    if (!newItem.name || !newItem.price) return;
+    setRegForm(prev => ({
+      ...prev,
+      menu: [...prev.menu, { name: newItem.name, price: Number(newItem.price) }]
+    }));
+    setNewItem({ name: '', price: '' });
+  };
+
+  const removeMenuItem = (index: number) => {
+    setRegForm(prev => ({
+      ...prev,
+      menu: prev.menu.filter((_, i) => i !== index)
+    }));
   };
 
   const handleDeleteProfile = (e: React.MouseEvent, id: string) => {
@@ -211,15 +246,44 @@ export default function App() {
       emoji: profile.emoji,
       cuisine: profile.cuisine,
       address: `Current Live Vendor Position @ ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`,
-      description: alert.tamilSummary
+      description: alert.tamilSummary,
+      menu: profile.menu
     };
 
     setShops(prev => {
       const filtered = prev.filter(s => s.id !== liveShop.id && s.id !== profile.id);
       return [liveShop, ...filtered];
     });
+
+    // Create a notification for explorers
+    const newNotif: Notification = {
+      id: Math.random().toString(),
+      title: "LIVE BROADCAST DETECTED",
+      message: `${profile.name} is now LIVE at a new location!`,
+      emoji: profile.emoji,
+      coords: location,
+      shopId: liveShop.id
+    };
+    
+    setNotifications(prev => [newNotif, ...prev]);
+    
+    // Auto-remove notification after 10 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== newNotif.id));
+    }, 10000);
     
     addLog('Spatial', 'Live node anchored to spatial grid.', 'resolved');
+  };
+
+  const handleNotifClick = (notif: Notification) => {
+    const shop = shops.find(s => s.id === notif.shopId);
+    if (shop) {
+      handleShopSelect(shop);
+    } else {
+      setLocation(notif.coords);
+    }
+    setNotifications(prev => prev.filter(n => n.id !== notif.id));
+    if (userMode !== 'explorer') setUserMode('explorer');
   };
 
   const activeProfile = myProfiles.find(p => p.id === activeProfileId);
@@ -227,6 +291,30 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden">
+      {/* Real-time Explorer Notifications */}
+      <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[3000] flex flex-col gap-3 pointer-events-none">
+        {notifications.map(n => (
+          <div 
+            key={n.id} 
+            className="w-80 bg-black/90 backdrop-blur-xl border border-emerald-500/50 rounded-2xl p-4 shadow-2xl shadow-emerald-500/20 animate-in slide-in-from-top-5 pointer-events-auto cursor-pointer group"
+            onClick={() => handleNotifClick(n)}
+          >
+            <div className="flex gap-4 items-start">
+              <div className="text-3xl bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">{n.emoji}</div>
+              <div className="flex-1">
+                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">{n.title}</p>
+                <p className="text-[11px] font-bold text-white mb-2 leading-tight">{n.message}</p>
+                <button className="text-[8px] font-black text-indigo-400 uppercase tracking-widest group-hover:underline">View On Map ➔</button>
+              </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setNotifications(prev => prev.filter(notif => notif.id !== n.id)); }} 
+                className="text-white/20 hover:text-white"
+              >✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Sidebar: Action Hub */}
       <div className="w-[450px] border-r border-white/5 bg-[#080808] flex flex-col z-20">
         <div className="p-8 border-b border-white/5 bg-gradient-to-b from-indigo-500/10 to-transparent">
@@ -395,31 +483,34 @@ export default function App() {
         
         {/* Registration Overlay */}
         {isRegistering && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-[2000] flex items-center justify-center p-6">
-            <div className="w-full max-w-md bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-[2000] flex items-center justify-center p-6 overflow-y-auto">
+            <div className="w-full max-w-md bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 my-10">
               <div className="p-8 border-b border-white/5 bg-white/5 flex justify-between items-center">
                 <h2 className="text-xs font-black uppercase tracking-[0.4em] text-white">Node Registration</h2>
-                <div className="text-[8px] font-black text-indigo-400 animate-pulse">FIXED STATION MODE</div>
+                <div className="text-[8px] font-black text-indigo-400 animate-pulse">MENU ARCHITECT ENABLED</div>
               </div>
               <div className="p-8 space-y-6">
-                <div>
-                  <label className="text-[9px] font-black uppercase text-white/40 block mb-2">Business Identity</label>
-                  <input 
-                    value={regForm.name}
-                    onChange={e => setRegForm({...regForm, name: e.target.value})}
-                    placeholder="e.g. Mamu's Biryani Stall"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:border-indigo-500 transition-all text-white"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-white/40 block mb-2">Business Identity</label>
+                    <input 
+                      value={regForm.name}
+                      onChange={e => setRegForm({...regForm, name: e.target.value})}
+                      placeholder="Shop Name"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-bold outline-none focus:border-indigo-500 transition-all text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-white/40 block mb-2">Signature Cuisine</label>
+                    <input 
+                      value={regForm.cuisine}
+                      onChange={e => setRegForm({...regForm, cuisine: e.target.value})}
+                      placeholder="Cuisine Type"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-bold outline-none focus:border-indigo-500 transition-all text-white"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[9px] font-black uppercase text-white/40 block mb-2">Signature Cuisine</label>
-                  <input 
-                    value={regForm.cuisine}
-                    onChange={e => setRegForm({...regForm, cuisine: e.target.value})}
-                    placeholder="e.g. Authentic Burmese Atho"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold outline-none focus:border-indigo-500 transition-all text-white"
-                  />
-                </div>
+
                 <div>
                   <div className="flex justify-between items-end mb-2">
                     <label className="text-[9px] font-black uppercase text-white/40">Shop Bio</label>
@@ -435,9 +526,48 @@ export default function App() {
                     value={regForm.description}
                     onChange={e => setRegForm({...regForm, description: e.target.value})}
                     placeholder="Tell your story or use AI..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-bold outline-none focus:border-indigo-500 transition-all text-white h-24 resize-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-xs font-bold outline-none focus:border-indigo-500 transition-all text-white h-20 resize-none"
                   />
                 </div>
+
+                {/* Menu Management Section */}
+                <div className="space-y-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <label className="text-[9px] font-black uppercase text-white/40 block mb-2">Menu & Pricing</label>
+                  <div className="flex gap-2">
+                    <input 
+                      value={newItem.name}
+                      onChange={e => setNewItem({...newItem, name: e.target.value})}
+                      placeholder="Item Name"
+                      className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] font-bold outline-none focus:border-indigo-500 transition-all text-white"
+                    />
+                    <input 
+                      value={newItem.price}
+                      type="number"
+                      onChange={e => setNewItem({...newItem, price: e.target.value})}
+                      placeholder="Price (₹)"
+                      className="w-20 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] font-bold outline-none focus:border-indigo-500 transition-all text-white"
+                    />
+                    <button 
+                      onClick={addMenuItem}
+                      className="px-4 bg-indigo-600 text-white text-[10px] font-black rounded-lg hover:bg-indigo-700"
+                    >
+                      ADD
+                    </button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-2 custom-scrollbar pr-2">
+                    {regForm.menu.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center p-2 rounded-lg bg-white/5 text-[9px] font-bold border border-white/5 group">
+                        <span className="text-white uppercase">{item.name}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-emerald-400">₹{item.price}</span>
+                          <button onClick={() => removeMenuItem(i)} className="text-red-500/50 hover:text-red-500">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    {regForm.menu.length === 0 && <p className="text-center text-[8px] opacity-20 py-4 italic uppercase">No items added yet</p>}
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
                   <label className="text-[9px] font-black uppercase text-white/40">Brand Icon</label>
                   <div className="flex gap-2">
@@ -445,18 +575,14 @@ export default function App() {
                       <button 
                         key={emoji}
                         onClick={() => setRegForm({...regForm, emoji})}
-                        className={`text-2xl p-2 rounded-lg transition-all ${regForm.emoji === emoji ? 'bg-indigo-600 scale-110 shadow-lg' : 'hover:bg-white/5'}`}
+                        className={`text-xl p-2 rounded-lg transition-all ${regForm.emoji === emoji ? 'bg-indigo-600 scale-110 shadow-lg' : 'hover:bg-white/5'}`}
                       >
                         {emoji}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="bg-indigo-500/5 p-4 rounded-xl border border-indigo-500/10">
-                  <p className="text-[8px] font-black text-indigo-300/60 uppercase tracking-widest leading-relaxed">
-                    Captured Station: {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
-                  </p>
-                </div>
+                
                 <div className="flex gap-4 pt-4">
                   <button onClick={() => setIsRegistering(false)} className="flex-1 py-4 text-[9px] font-black uppercase text-white/40 hover:text-white transition-all">Cancel</button>
                   <button onClick={handleRegister} className="flex-[2] py-4 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-500/20">Finalize Link</button>
@@ -469,29 +595,50 @@ export default function App() {
         {activeShop && (
           <div className="absolute bottom-10 left-10 right-10 z-[1000] animate-in slide-in-from-bottom-5 duration-500">
             <div className="max-w-4xl mx-auto bg-black/90 backdrop-blur-3xl p-8 rounded-[2rem] border border-white/10 shadow-2xl flex gap-8">
-              <div className="text-6xl">{activeShop.emoji}</div>
-              <div className="flex-1">
+              <div className="text-6xl flex-shrink-0">{activeShop.emoji}</div>
+              <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-black text-white">{activeShop.name}</h3>
+                  <div className="min-w-0">
+                    <h3 className="text-xl font-black text-white truncate">{activeShop.name}</h3>
                     <div className="flex gap-2 items-center mt-1">
                       <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{activeShop.cuisine || 'Legendary Discovery'}</p>
                       <span className="text-white/20">•</span>
-                      <p className="text-[10px] font-black text-white/60 uppercase tracking-widest">{activeShop.address || 'Chennai'}</p>
+                      <p className="text-[10px] font-black text-white/60 uppercase tracking-widest truncate">{activeShop.address || 'Chennai'}</p>
                     </div>
                   </div>
-                  <button onClick={() => setActiveShop(null)} className="text-white/30 hover:text-white">✕</button>
+                  <button onClick={() => setActiveShop(null)} className="text-white/30 hover:text-white ml-4">✕</button>
                 </div>
-                <p className="text-sm text-slate-400 leading-relaxed mb-6">{activeShop.description}</p>
-                <div className="flex gap-4">
-                  <a 
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`}
-                    target="_blank"
-                    className="px-6 py-3 bg-white text-black text-[10px] font-black uppercase rounded-lg hover:scale-105 transition-all"
-                  >
-                    Nav Logic
-                  </a>
-                  {activeShop.sourceUrl && <a href={activeShop.sourceUrl} target="_blank" className="px-6 py-3 border border-white/10 text-white text-[10px] font-black uppercase rounded-lg">Watch Original</a>}
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div>
+                    <p className="text-sm text-slate-400 leading-relaxed mb-6">{activeShop.description}</p>
+                    <div className="flex gap-4">
+                      <a 
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`}
+                        target="_blank"
+                        className="px-6 py-3 bg-white text-black text-[10px] font-black uppercase rounded-lg hover:scale-105 transition-all"
+                      >
+                        Nav Logic
+                      </a>
+                      {activeShop.sourceUrl && <a href={activeShop.sourceUrl} target="_blank" className="px-6 py-3 border border-white/10 text-white text-[10px] font-black uppercase rounded-lg">Watch Original</a>}
+                    </div>
+                  </div>
+
+                  {/* Menu Display Section */}
+                  {activeShop.menu && activeShop.menu.length > 0 && (
+                    <div className="bg-white/5 rounded-2xl p-6 border border-white/5">
+                      <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 mb-4">Available Ration / Menu</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {activeShop.menu.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 bg-[#111] border border-white/10 rounded-lg px-3 py-2 group hover:border-emerald-500/50 transition-all">
+                            <span className="text-[10px] font-bold text-slate-300 uppercase">{item.name}</span>
+                            <div className="h-4 w-px bg-white/10"></div>
+                            <span className="text-[10px] font-black text-emerald-400">₹{item.price}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
