@@ -1,8 +1,9 @@
 {
-  "name": "GeoMind - AI Map Explorer",
-  "description": "An interactive map-based chatbot that combines Gemini's reasoning with real-time Google Maps and Search grounding to explore the world.",
+  "name": "GeoMind: Action Era Discovery",
+  "description": "An orchestrated spatial reasoning engine that mines vlogger data and provides landmark-aware live vendor tracking.",
   "requestFramePermissions": [
-    "geolocation",
-    "microphone"
+    "camera",
+    "microphone",
+    "geolocation"
   ]
 }
