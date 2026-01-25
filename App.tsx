@@ -75,6 +75,7 @@ export default function App() {
   const [regForm, setRegForm] = useState({ name: '', cuisine: '', emoji: '🥘', description: '', menu: [] as MenuItem[] });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
@@ -246,6 +247,27 @@ export default function App() {
       setShops(prev => prev.filter(s => !s.id.includes(id)));
       if (activeProfileId === id) setActiveProfileId(null);
     }
+  };
+
+  const handleUpdateLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setIsUpdatingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const newCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(newCoords);
+        setIsUpdatingLocation(false);
+      },
+      (err) => {
+        console.error(err);
+        alert("Failed to retrieve location. Please check permissions.");
+        setIsUpdatingLocation(false);
+      },
+      { enableHighAccuracy: true }
+    );
   };
 
   const activeProfile = myProfiles.find(p => p.id === activeProfileId);
@@ -489,6 +511,36 @@ export default function App() {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-[2000] flex items-center justify-center p-6 overflow-y-auto">
             <div className="w-full max-w-lg bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] p-8 space-y-6 animate-in zoom-in-95 my-auto">
               <h2 className="text-xs font-black uppercase text-white tracking-[0.3em] text-center">Node Link Initialization</h2>
+              
+              {/* Spatial Coordinates Section */}
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl -z-10"></div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">Live Spatial Feed</span>
+                  </div>
+                  <button 
+                    onClick={handleUpdateLocation} 
+                    disabled={isUpdatingLocation}
+                    className="flex items-center gap-2 text-[8px] font-black text-indigo-400 hover:text-indigo-300 uppercase bg-indigo-500/5 px-2 py-1 rounded-md border border-indigo-500/10 transition-all disabled:opacity-50"
+                  >
+                    <svg className={`w-3 h-3 ${isUpdatingLocation ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    {isUpdatingLocation ? "SYNCING..." : "UPDATE LOCATION"}
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="bg-black/40 p-3 rounded-xl border border-white/5">
+                    <p className="text-[7px] font-black text-white/20 uppercase mb-1">LATITUDE</p>
+                    <p className="text-sm font-black text-emerald-400 font-mono tracking-widest">{location.lat.toFixed(6)}</p>
+                  </div>
+                  <div className="bg-black/40 p-3 rounded-xl border border-white/5">
+                    <p className="text-[7px] font-black text-white/20 uppercase mb-1">LONGITUDE</p>
+                    <p className="text-sm font-black text-emerald-400 font-mono tracking-widest">{location.lng.toFixed(6)}</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[8px] font-black text-white/40 uppercase">Identity</label>
@@ -529,7 +581,7 @@ export default function App() {
 
               <div className="flex gap-4 pt-4 border-t border-white/5">
                 <button onClick={() => setIsRegistering(false)} className="flex-1 py-4 text-[9px] font-black text-white/40 uppercase hover:text-white transition-all">Abort</button>
-                <button onClick={handleRegister} className="flex-[2] py-4 bg-indigo-600 text-white text-[10px] font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20">Link Profile</button>
+                <button onClick={handleRegister} className="flex-[2] py-4 bg-indigo-600 text-white text-[10px] font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/20">Finalize Link</button>
               </div>
             </div>
           </div>
