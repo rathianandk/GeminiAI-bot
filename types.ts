@@ -9,9 +9,17 @@ export enum VendorStatus {
   OFFLINE = 'OFFLINE'
 }
 
-export interface GroundingChunk {
-  web?: { uri: string; title: string };
-  maps?: { uri: string; title: string };
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  sources?: GroundingSource[];
+  isThinking?: boolean;
 }
 
 export interface MenuItem {
@@ -49,12 +57,4 @@ export interface AgentLog {
   agent: 'Discovery' | 'Linguistic' | 'Spatial';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
-}
-
-export interface AppState {
-  isMining: boolean;
-  discoveredShops: Shop[];
-  logs: AgentLog[];
-  activeShop: Shop | null;
-  userLocation: LatLng | null;
 }

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { Shop, LatLng } from "../types";
+import { Shop, LatLng, GroundingSource } from "../types";
 
 export const generateVendorBio = async (name: string, cuisine: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -19,6 +19,52 @@ export const generateVendorBio = async (name: string, cuisine: string): Promise<
     return response.text?.trim() || `The most legendary ${cuisine} spot in town!`;
   } catch (error) {
     return `Famous ${cuisine} destination.`;
+  }
+};
+
+export const spatialChatAgent = async (message: string, center: LatLng): Promise<{ text: string; sources: GroundingSource[] }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: message,
+      config: {
+        tools: [{ googleMaps: {} }],
+        toolConfig: {
+          retrievalConfig: {
+            latLng: {
+              latitude: center.lat,
+              longitude: center.lng
+            }
+          }
+        }
+      }
+    });
+
+    const text = response.text || "I'm having trouble retrieving details for that location.";
+    const sources: GroundingSource[] = [];
+
+    // Extract grounding sources as per mandatory requirements
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    chunks.forEach((chunk: any) => {
+      if (chunk.maps) {
+        sources.push({
+          title: chunk.maps.title || "Map Location",
+          uri: chunk.maps.uri
+        });
+      } else if (chunk.web) {
+        sources.push({
+          title: chunk.web.title || "Web Source",
+          uri: chunk.web.uri
+        });
+      }
+    });
+
+    return { text, sources };
+  } catch (error) {
+    console.error("Chat Error:", error);
+    return { text: "The spatial grid is currently unstable. Please try again.", sources: [] };
   }
 };
 
