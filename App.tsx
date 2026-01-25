@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import Map from './components/Map';
+// Renamed Map to FoodMap to avoid conflict with the native Map constructor
+import FoodMap from './components/Map';
 import { discoveryAgent, spatialAlertAgent, summarizeInTamil, generateVendorBio, spatialChatAgent } from './services/geminiService';
 import { Shop, LatLng, AgentLog, VendorStatus, VendorProfile, MenuItem, ChatMessage, GroundingSource } from './types';
 
@@ -17,7 +18,8 @@ const SEED_PROFILES: VendorProfile[] = [
     cuisine: 'Biryani', 
     description: 'Triplicane wood-fired legacy.', 
     lastLocation: { lat: 13.0585, lng: 80.2730 }, 
-    menu: [{ name: 'Mutton Biryani', price: 250 }, { name: 'Chicken 65', price: 120 }] 
+    menu: [{ name: 'Mutton Biryani', price: 250 }, { name: 'Chicken 65', price: 120 }],
+    hours: '12:00 - 23:00'
   }
 ];
 
@@ -31,18 +33,30 @@ function decodeBase64(b64: string) {
   return bytes;
 }
 
-async function playPCM(base64: string) {
+async function playPCM(base64: string, onStart?: () => void) {
   if (!base64) return;
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-  const bytes = decodeBase64(base64);
-  const int16 = new Int16Array(bytes.buffer);
-  const buffer = audioCtx.createBuffer(1, int16.length, 24000);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < int16.length; i++) data[i] = int16[i] / 32768.0;
-  const source = audioCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(audioCtx.destination);
-  source.start();
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+    
+    const bytes = decodeBase64(base64);
+    // Safer conversion to Int16
+    const int16 = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+    const buffer = audioCtx.createBuffer(1, int16.length, 24000);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < int16.length; i++) data[i] = int16[i] / 32768.0;
+    
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    
+    if (onStart) onStart();
+    source.start();
+  } catch (err) {
+    console.error("Audio Playback Error:", err);
+  }
 }
 
 export default function App() {
@@ -72,38 +86,70 @@ export default function App() {
   });
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
-  const [regForm, setRegForm] = useState({ name: '', cuisine: '', emoji: '🥘', description: '', menu: [] as MenuItem[] });
+  const [regForm, setRegForm] = useState({ 
+    name: '', 
+    cuisine: '', 
+    emoji: '🥘', 
+    description: '', 
+    startHour: 9, 
+    endHour: 22, 
+    menu: [] as MenuItem[] 
+  });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
 
+  // Synchronize registered profiles and live vendors with the map state
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
-    const profileShops: Shop[] = myProfiles.map(p => ({
-      id: p.id,
-      name: p.name,
-      coords: p.lastLocation || location,
-      isVendor: true,
-      status: VendorStatus.OFFLINE,
-      emoji: p.emoji,
-      cuisine: p.cuisine,
-      address: 'Registered Node',
-      description: p.description,
-      menu: p.menu
-    }));
     
-    setShops(prev => {
-      const discovered = prev.filter(s => !s.isVendor);
-      const liveVendors = prev.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
-      const baseVendors = profileShops.filter(ps => !liveVendors.some(lv => lv.id === `live-${ps.id}`));
-      return [...discovered, ...liveVendors, ...baseVendors];
+    setShops(prevShops => {
+      const baseShops = prevShops.filter(s => !s.isVendor);
+      const liveVendorMap = new Map<string, Shop>();
+      prevShops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE).forEach(s => {
+        liveVendorMap.set(s.id, s);
+      });
+
+      const profileShops: Shop[] = myProfiles.map(p => {
+        const liveId = `live-${p.id}`;
+        const isLive = liveVendorMap.has(liveId);
+        
+        if (isLive) {
+          const existingLive = liveVendorMap.get(liveId)!;
+          return {
+            ...existingLive,
+            name: p.name,
+            emoji: p.emoji,
+            cuisine: p.cuisine,
+            hours: p.hours,
+            menu: p.menu,
+            coords: p.lastLocation || existingLive.coords
+          };
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          coords: p.lastLocation || location,
+          isVendor: true,
+          status: VendorStatus.OFFLINE,
+          emoji: p.emoji,
+          cuisine: p.cuisine,
+          address: 'Stationary Node',
+          description: p.description,
+          hours: p.hours,
+          menu: p.menu
+        };
+      });
+
+      return [...baseShops, ...profileShops];
     });
   }, [myProfiles]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatHistory]);
 
   const addLog = (agent: AgentLog['agent'], message: string, status: AgentLog['status'] = 'processing') => {
-    setLogs(prev => [{ id: Math.random().toString(), agent, message, status }, ...prev.slice(0, 15)]);
+    setLogs(prev => [{ id: Math.random().toString(), agent, message, status }, ...prev.slice(0, 20)]);
   };
 
   const startVoiceInput = () => {
@@ -151,9 +197,21 @@ export default function App() {
   const handleShopSelect = async (shop: Shop) => {
     setActiveShop(shop);
     setLocation(shop.coords);
+    
+    // Immediate log to show agency
+    addLog('Linguistic', `Synthesizing local insights for "${shop.name}"...`, 'processing');
+    
     const { tamilText, englishText, audioData } = await summarizeInTamil(shop);
     addLog('Linguistic', `${tamilText}\n\n${englishText}`, 'resolved');
-    if (audioData) playPCM(audioData);
+    
+    if (audioData) {
+      addLog('Linguistic', 'Vocal sequence initialized...', 'processing');
+      playPCM(audioData, () => {
+        addLog('Linguistic', 'Vocalizing node summary...', 'resolved');
+      });
+    } else {
+      addLog('Linguistic', 'Vocal synthesis unavailable for this node.', 'failed');
+    }
   };
 
   const handleNotifClick = (n: Notification) => {
@@ -162,17 +220,19 @@ export default function App() {
   };
 
   const handleRegister = () => {
+    const formattedHours = `${regForm.startHour.toString().padStart(2, '0')}:00 - ${regForm.endHour.toString().padStart(2, '0')}:00`;
     const newProfile: VendorProfile = { 
       id: `profile-${Date.now()}`, 
       name: regForm.name, 
       emoji: regForm.emoji, 
       cuisine: regForm.cuisine, 
       description: regForm.description, 
+      hours: formattedHours,
       lastLocation: location, 
       menu: regForm.menu 
     };
     setMyProfiles(prev => [...prev, newProfile]);
-    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', menu: [] });
+    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] });
     setNewItem({ name: '', price: '' });
     setIsRegistering(false);
     setActiveProfileId(newProfile.id);
@@ -215,12 +275,24 @@ export default function App() {
     }));
   };
 
+  const handleUpdateProfileHoursRange = (start: number, end: number) => {
+    if (!activeProfileId) return;
+    const formatted = `${start.toString().padStart(2, '0')}:00 - ${end.toString().padStart(2, '0')}:00`;
+    setMyProfiles(prev => prev.map(p => p.id === activeProfileId ? { ...p, hours: formatted } : p));
+  };
+
   const handleBroadcastLive = async () => {
     const profile = myProfiles.find(p => p.id === activeProfileId);
     if (!profile) return;
-    addLog('Spatial', `Broadcasting live signal...`);
+    
+    const isAlreadyLive = shops.some(s => s.id === `live-${profile.id}` && s.status === VendorStatus.ONLINE);
+    addLog('Spatial', isAlreadyLive ? `Updating live spatial parameters...` : `Broadcasting live signal...`);
+    
     const alert = await spatialAlertAgent(profile.name, location);
-    if (alert.audioData) playPCM(alert.audioData);
+    if (alert.audioData) {
+      addLog('Spatial', 'Vocalizing broadcast guide...', 'processing');
+      playPCM(alert.audioData);
+    }
     
     const liveShop: Shop = { 
       id: `live-${profile.id}`, 
@@ -232,13 +304,20 @@ export default function App() {
       cuisine: profile.cuisine, 
       address: `LIVE POS @ ${location.lat.toFixed(4)}`, 
       description: alert.tamilSummary, 
+      hours: profile.hours,
       menu: profile.menu 
     };
-    setShops(prev => [liveShop, ...prev.filter(s => s.id !== liveShop.id && s.id !== profile.id)]);
+    
+    setShops(prev => {
+      const filtered = prev.filter(s => s.id !== liveShop.id && s.id !== profile.id);
+      return [liveShop, ...filtered];
+    });
 
-    const newNotif: Notification = { id: Math.random().toString(), title: "LIVE BROADCAST", message: `${profile.name} is LIVE!`, emoji: profile.emoji, coords: location, shopId: liveShop.id };
-    setNotifications(prev => [newNotif, ...prev]);
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== newNotif.id)), 10000);
+    if (!isAlreadyLive) {
+      const newNotif: Notification = { id: Math.random().toString(), title: "LIVE BROADCAST", message: `${profile.name} is LIVE!`, emoji: profile.emoji, coords: location, shopId: liveShop.id };
+      setNotifications(prev => [newNotif, ...prev]);
+      setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== newNotif.id)), 10000);
+    }
   };
 
   const handleDeleteProfile = (id: string) => {
@@ -259,6 +338,14 @@ export default function App() {
       (pos) => {
         const newCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setLocation(newCoords);
+        if (activeProfileId) {
+          setMyProfiles(prev => prev.map(p => {
+            if (p.id === activeProfileId) {
+              return { ...p, lastLocation: newCoords };
+            }
+            return p;
+          }));
+        }
         setIsUpdatingLocation(false);
       },
       (err) => {
@@ -273,6 +360,21 @@ export default function App() {
   const activeProfile = myProfiles.find(p => p.id === activeProfileId);
   const discoveredShops = shops.filter(s => !s.isVendor);
   const vendorShops = shops.filter(s => s.isVendor);
+  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
+
+  // Extract start/end hours from existing string range
+  const currentStartHour = activeProfile?.hours ? parseInt(activeProfile.hours.split(' - ')[0]) : 9;
+  const currentEndHour = activeProfile?.hours ? parseInt(activeProfile.hours.split(' - ')[1]) : 22;
+
+  // Helper to get agent colors
+  const getAgentColorClasses = (agent: AgentLog['agent']) => {
+    switch (agent) {
+      case 'Discovery': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'Linguistic': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'Spatial': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      default: return 'bg-white/10 text-white/40 border-white/10';
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden">
@@ -338,7 +440,7 @@ export default function App() {
       </div>
 
       {/* Action Hub Sidebar */}
-      <div className="w-[450px] border-r border-white/5 bg-[#080808] flex flex-col z-20">
+      <div className="w-[450px] border-r border-white/5 bg-[#080808] flex flex-col z-20 shadow-2xl">
         <div className="p-8 border-b border-white/5 bg-gradient-to-b from-indigo-500/10 to-transparent">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-sm font-black tracking-[0.4em] text-white">GEOMIND: CORE</h1>
@@ -369,7 +471,9 @@ export default function App() {
                     </div>
                     <button onClick={() => setActiveProfileId(null)} className="text-[8px] font-black text-white/40 uppercase px-2 py-1 bg-white/5 rounded">Exit Hub</button>
                   </div>
-                  <button onClick={handleBroadcastLive} className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl shadow-emerald-500/20">🚀 BROADCAST LIVE SIGNAL</button>
+                  <button onClick={handleBroadcastLive} className={`w-full py-4 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-xl transition-all ${isCurrentlyLive ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
+                    {isCurrentlyLive ? '🔄 UPDATE LIVE BROADCAST' : '🚀 START LIVE BROADCAST'}
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -394,10 +498,14 @@ export default function App() {
                   </div>
                 </div>
               )}
+              {logs.length === 0 && <p className="text-[10px] text-white/20 italic text-center py-10">Intelligence stream inactive. Run discovery or select a node.</p>}
               {logs.map(log => (
-                <div key={log.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a]">
-                  <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${log.agent === 'Discovery' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>{log.agent}</span>
-                  <p className="text-[9px] font-bold text-slate-400 mt-2 leading-relaxed whitespace-pre-line">{log.message}</p>
+                <div key={log.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-top-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${getAgentColorClasses(log.agent)}`}>{log.agent}</span>
+                    <span className="text-[6px] font-black text-white/10 uppercase">{log.status}</span>
+                  </div>
+                  <p className="text-[9px] font-bold text-slate-400 leading-relaxed whitespace-pre-line">{log.message}</p>
                 </div>
               ))}
             </div>
@@ -455,19 +563,69 @@ export default function App() {
           ) : userMode === 'vendor' && activeProfileId ? (
             <div className="space-y-6">
               <div className="space-y-4">
-                <h4 className="text-[8px] font-black uppercase text-white/40 tracking-widest">Live Menu Management</h4>
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[8px] font-black uppercase text-white/40 tracking-widest">Live Node Parameters</h4>
+                  <button 
+                    onClick={handleUpdateLocation} 
+                    disabled={isUpdatingLocation}
+                    className="flex items-center gap-2 text-[7px] font-black text-emerald-400 uppercase bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10 transition-all"
+                  >
+                    <svg className={`w-3 h-3 ${isUpdatingLocation ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {isUpdatingLocation ? 'SYNCING...' : 'SYNC CURRENT LOCATION'}
+                  </button>
+                </div>
+                
+                {/* Real-time Coord Display */}
+                <div className="grid grid-cols-2 gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                  <div>
+                    <p className="text-[6px] font-black text-white/20 uppercase mb-1">LAT</p>
+                    <p className="text-[10px] font-black text-indigo-400 font-mono">{(activeProfile?.lastLocation?.lat || location.lat).toFixed(6)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[6px] font-black text-white/20 uppercase mb-1">LNG</p>
+                    <p className="text-[10px] font-black text-indigo-400 font-mono">{(activeProfile?.lastLocation?.lng || location.lng).toFixed(6)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[7px] font-black text-white/20 uppercase">Operating Hours (24h)</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={currentStartHour} 
+                        onChange={e => handleUpdateProfileHoursRange(parseInt(e.target.value), currentEndHour)} 
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] text-white outline-none focus:border-indigo-500 transition-all" 
+                      />
+                      <span className="flex items-center text-white/20">TO</span>
+                      <input 
+                        type="number"
+                        min="0"
+                        max="23"
+                        value={currentEndHour} 
+                        onChange={e => handleUpdateProfileHoursRange(currentStartHour, parseInt(e.target.value))} 
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] text-white outline-none focus:border-indigo-500 transition-all" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <h4 className="text-[8px] font-black uppercase text-white/40 tracking-widest mt-6">Live Menu Management</h4>
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-4">
                   <div className="flex gap-2">
                     <input 
                       value={newItem.name} 
                       onChange={e => setNewItem({...newItem, name: e.target.value})} 
-                      placeholder="Item Name (e.g. Masala Dosa)" 
+                      placeholder="Item Name" 
                       className="flex-[2] bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] text-white outline-none focus:border-indigo-500" 
                     />
                     <input 
+                      type="number"
                       value={newItem.price} 
                       onChange={e => setNewItem({...newItem, price: e.target.value})} 
-                      placeholder="₹ Price" 
+                      placeholder="₹" 
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] text-white outline-none focus:border-indigo-500" 
                     />
                     <button 
@@ -477,7 +635,7 @@ export default function App() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
                     </button>
                   </div>
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
                     {activeProfile?.menu.length === 0 ? (
                       <p className="text-[9px] text-white/20 italic text-center py-4">No menu items active.</p>
                     ) : (
@@ -505,11 +663,11 @@ export default function App() {
       </div>
 
       <div className="flex-1 relative">
-        <Map center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
+        <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
         
         {isRegistering && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-[2000] flex items-center justify-center p-6 overflow-y-auto">
-            <div className="w-full max-w-lg bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] p-8 space-y-6 animate-in zoom-in-95 my-auto">
+            <div className="w-full max-w-lg bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] p-8 space-y-6 animate-in zoom-in-95 my-auto shadow-[0_0_100px_rgba(79,70,229,0.2)]">
               <h2 className="text-xs font-black uppercase text-white tracking-[0.3em] text-center">Node Link Initialization</h2>
               
               {/* Spatial Coordinates Section */}
@@ -552,6 +710,31 @@ export default function App() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-white/40 uppercase">Truck Hours (24h Range)</label>
+                  <div className="flex gap-4">
+                    <input 
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={regForm.startHour} 
+                      onChange={e => setRegForm({...regForm, startHour: parseInt(e.target.value)})} 
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-white outline-none focus:border-indigo-500 transition-all" 
+                    />
+                    <span className="flex items-center text-white/20">TO</span>
+                    <input 
+                      type="number"
+                      min="0"
+                      max="23"
+                      value={regForm.endHour} 
+                      onChange={e => setRegForm({...regForm, endHour: parseInt(e.target.value)})} 
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 text-xs text-white outline-none focus:border-indigo-500 transition-all" 
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-[8px] font-black text-white/40 uppercase">Spatial Bio</label>
@@ -566,10 +749,16 @@ export default function App() {
                 <label className="text-[8px] font-black text-white/40 uppercase">Initial Menu Configuration</label>
                 <div className="flex gap-2">
                   <input value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="Item" className="flex-[2] bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-indigo-500" />
-                  <input value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} placeholder="₹" className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-xs text-white outline-none focus:border-indigo-500" />
+                  <input 
+                    type="number"
+                    value={newItem.price} 
+                    onChange={e => setNewItem({...newItem, price: e.target.value})} 
+                    placeholder="₹" 
+                    className="flex-1 bg-white/5 border border-white/10 rounded-lg p-3 text-[10px] text-white outline-none focus:border-indigo-500" 
+                  />
                   <button onClick={handleAddItemToReg} className="bg-white/5 hover:bg-white/10 text-white p-3 rounded-xl border border-white/10"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg></button>
                 </div>
-                <div className="space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar">
+                <div className="space-y-2 max-h-[100px] overflow-y-auto custom-scrollbar">
                   {regForm.menu.map((item, idx) => (
                     <div key={idx} className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
                       <span className="text-[10px] text-white font-black uppercase">{item.name} <span className="text-indigo-400 ml-2">₹{item.price}</span></span>
@@ -590,17 +779,18 @@ export default function App() {
         {activeShop && (
           <div className="absolute bottom-10 left-10 right-10 z-[1000] animate-in slide-in-from-bottom-5">
             <div className="max-w-5xl mx-auto bg-black/90 backdrop-blur-3xl p-8 rounded-[2.5rem] border border-white/10 shadow-2xl flex flex-col md:flex-row gap-8">
-              <div className="text-7xl flex-shrink-0 flex items-center justify-center bg-white/5 p-6 rounded-3xl border border-white/5">{activeShop.emoji}</div>
+              <div className="text-7xl flex-shrink-0 flex items-center justify-center bg-white/5 p-6 rounded-3xl border border-white/5 h-fit mt-2">{activeShop.emoji}</div>
               <div className="flex-1 min-w-0 space-y-4">
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="text-2xl font-black text-white tracking-tight truncate">{activeShop.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
                       <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">{activeShop.cuisine}</p>
-                      {activeShop.isVendor && (
-                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          <span className="text-[8px] font-black text-emerald-400 uppercase">Verified Vendor</span>
+                      <span className="text-[8px] font-black text-emerald-400 px-2 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase">Linguistic Summary Available</span>
+                      {activeShop.hours && (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 rounded-full border border-white/10">
+                          <svg className="w-2.5 h-2.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <span className="text-[8px] font-black text-white/60 uppercase">{activeShop.hours}</span>
                         </div>
                       )}
                     </div>

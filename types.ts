@@ -40,6 +40,7 @@ export interface Shop {
   sourceUrl?: string;
   landmarks?: string[];
   menu?: MenuItem[];
+  hours?: string;
 }
 
 export interface VendorProfile {
@@ -50,6 +51,7 @@ export interface VendorProfile {
   description: string;
   lastLocation?: LatLng;
   menu: MenuItem[];
+  hours?: string;
 }
 
 export interface AgentLog {
