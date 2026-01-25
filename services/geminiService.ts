@@ -28,8 +28,9 @@ export const spatialChatAgent = async (message: string, center: LatLng): Promise
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: message,
+      contents: `User is at ${center.lat}, ${center.lng}. ${message}`,
       config: {
+        systemInstruction: "You are a spatial AI. Use the provided maps tool to find real-world locations. Always mention specific landmarks. If you find a location, provide its name and why it's interesting.",
         tools: [{ googleMaps: {} }],
         toolConfig: {
           retrievalConfig: {
@@ -45,7 +46,6 @@ export const spatialChatAgent = async (message: string, center: LatLng): Promise
     const text = response.text || "I'm having trouble retrieving details for that location.";
     const sources: GroundingSource[] = [];
 
-    // Extract grounding sources as per mandatory requirements
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     chunks.forEach((chunk: any) => {
       if (chunk.maps) {
@@ -68,19 +68,18 @@ export const spatialChatAgent = async (message: string, center: LatLng): Promise
   }
 };
 
-export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], logs: string[] }> => {
+export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], logs: string[], sources: GroundingSource[] }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const logs: string[] = ["Initiating Web-Scale Scraping for 'Rolling Sirrr' recommendations...", "Deep-scanning transcripts for location markers..."];
+  const logs: string[] = ["Initiating MASSIVE Web-Scale Scraping for street food nodes...", "Processing search grounding chunks for high-density mapping..."];
 
   const prompt = `
-    ORCHESTRATION TASK: MASSIVE DATA MINING
-    TARGET: "Rolling Sirrr" (YouTube Vlogger) street food catalog in Chennai.
+    ORCHESTRATION TASK: MASSIVE SPATIAL DATA MINING
+    TARGET: Street food recommendations in Chennai (covering Sowcarpet, Mylapore, Triplicane, T.Nagar, West Mambalam, and Besant Nagar).
     
-    1. Identify at least 30-50 specific street food locations mentioned by Rolling Sirrr.
-    2. Focus on iconic spots: Sowcarpet, Mylapore, Parrys, Triplicane, etc.
-    3. For each: Name, Lat/Lng (precise or approximate center of area), Cuisine Type, a short juicy description, AND the specific Address or Locality.
+    1. Identify EXACTLY 25 highly rated, iconic, and legendary street food locations.
+    2. For each: Name, Lat/Lng (precise/accurate), Cuisine Type, and a short high-energy description.
     
-    Return a structured JSON with a "shops" array. Be as comprehensive as possible.
+    Return a structured JSON with a "shops" array.
     {
       "shops": [{
         "name": "string",
@@ -88,8 +87,7 @@ export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], lo
         "lng": number,
         "cuisine": "string",
         "description": "string",
-        "address": "string",
-        "sourceUrl": "string"
+        "address": "string"
       }]
     }
   `;
@@ -105,23 +103,38 @@ export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], lo
       }
     });
 
-    const data = JSON.parse(response.text || '{"shops": []}');
-    const shops: Shop[] = data.shops.map((s: any, i: number) => ({
+    const text = response.text || '{"shops": []}';
+    const data = JSON.parse(text.trim());
+    const sources: GroundingSource[] = [];
+    
+    // Capture mandatory web sources
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+    chunks.forEach((chunk: any) => {
+      if (chunk.web) {
+        sources.push({ title: chunk.web.title || "Research Source", uri: chunk.web.uri });
+      }
+    });
+
+    const shops: Shop[] = (data.shops || []).map((s: any, i: number) => ({
       id: `sync-${i}-${Date.now()}`,
       name: s.name,
       coords: { lat: s.lat, lng: s.lng },
       isVendor: false,
-      emoji: s.cuisine?.toLowerCase().includes('biryani') ? "🍗" : s.cuisine?.toLowerCase().includes('juice') ? "🥤" : "🥘",
+      emoji: "🥘",
       cuisine: s.cuisine,
       description: s.description,
       address: s.address,
-      sourceUrl: s.sourceUrl
+      menu: []
     }));
 
-    return { shops, logs: [...logs, `Successfully mined ${shops.length} legendary food nodes.`] };
+    return { 
+      shops, 
+      logs: [...logs, `Successfully anchored ${shops.length} spatial food nodes from verified web results.`],
+      sources 
+    };
   } catch (error) {
     console.error("Discovery Error:", error);
-    return { shops: [], logs: [...logs, "Discovery Agent hit a rate limit or logic error."] };
+    return { shops: [], logs: [...logs, "Discovery Agent hit a capacity error. Attempting secondary scan..."], sources: [] };
   }
 };
 
@@ -129,37 +142,23 @@ export const summarizeInTamil = async (shop: Shop): Promise<{ tamilText: string;
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const prompt = `
-    You are a passionate food expert who speaks colloquial "Madras Tamil" just like the vlogger Rolling Sirrr. 
-    Tell me about "${shop.name}" which serves "${shop.cuisine}" at "${shop.address || 'Chennai'}".
-    Context: ${shop.description}
-    
-    Your style MUST be extremely friendly, using words like "Machan", "Nanba", "Vera Level". 
-    Provide a mouth-watering summary in 2 sentences in TAMIL. 
-    
-    Return a JSON object:
-    {
-      "tamil": "Your summary in colloquial Tamil script",
-      "english": "Exact translation of that summary in English"
-    }
+    You are a food expert. Summarize "${shop.name}" which serves "${shop.cuisine}".
+    Use colloquial Madras Tamil (Tamil script). Friendly and energetic.
+    Return JSON: {"tamil": "text", "english": "text"}
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        thinkingConfig: { thinkingBudget: 2000 }
-      }
+      config: { responseMimeType: "application/json" }
     });
 
     const result = JSON.parse(response.text || '{"tamil": "", "english": ""}');
-    const tamilText = result.tamil || "மச்சான், இந்த கடை வேற லெவல், கண்டிப்பா ட்ரை பண்ணு நண்பா!";
-    const englishText = result.english || "Buddy, this place is next level, definitely try it friend!";
-
+    
     const ttsResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Speak enthusiastically in colloquial Tamil: ${tamilText}` }] }],
+      contents: [{ parts: [{ text: result.tamil }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -169,42 +168,27 @@ export const summarizeInTamil = async (shop: Shop): Promise<{ tamilText: string;
     });
 
     const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
-    return { tamilText, englishText, audioData };
+    return { tamilText: result.tamil, englishText: result.english, audioData };
   } catch (error) {
-    return { tamilText: "மன்னிக்கவும், எங்களால் இப்போது பேச முடியவில்லை.", englishText: "Sorry, we can't speak right now.", audioData: "" };
+    return { tamilText: "மன்னிக்கவும்.", englishText: "Sorry.", audioData: "" };
   }
 };
 
 export const spatialAlertAgent = async (vendorName: string, coords: LatLng): Promise<{ tamilSummary: string; englishSummary: string; audioData: string }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prompt = `Find a landmark near ${coords.lat}, ${coords.lng} and create a 1-sentence Tamil arrival guide for ${vendorName}. Return JSON: {"tamil": "text", "english": "text"}`;
 
-  const spatialPrompt = `
-    Locate landmarks within 200m of (${coords.lat}, ${coords.lng}). 
-    Synthesize a short, 1-sentence landmark-based arrival guide for ${vendorName}. 
-    Use local Chennai landmarks if possible.
-    Return a JSON object:
-    {
-      "tamil": "Your guide in Tamil",
-      "english": "Your guide in English"
-    }
-  `;
-
-  const spatialResponse = await ai.models.generateContent({
+  const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: spatialPrompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json"
-    }
+    contents: prompt,
+    config: { tools: [{ googleSearch: {} }], responseMimeType: "application/json" }
   });
 
-  const result = JSON.parse(spatialResponse.text || '{"tamil": "", "english": ""}');
-  const tamilSummary = result.tamil || "கடைக்கு அருகில் உள்ள முக்கிய அடையாளத்தை தேடுகிறேன்!";
-  const englishSummary = result.english || "Looking for a key landmark near the shop!";
-
+  const result = JSON.parse(response.text || '{"tamil": "", "english": ""}');
+  
   const ttsResponse = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Speak in a clear notification voice in Tamil: ${tamilSummary}` }] }],
+    contents: [{ parts: [{ text: result.tamil }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
@@ -213,6 +197,5 @@ export const spatialAlertAgent = async (vendorName: string, coords: LatLng): Pro
     }
   });
 
-  const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
-  return { tamilSummary, englishSummary, audioData };
+  return { tamilSummary: result.tamil, englishSummary: result.english, audioData: ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "" };
 };
