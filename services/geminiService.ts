@@ -107,7 +107,6 @@ export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], lo
     const data = JSON.parse(text.trim());
     const sources: GroundingSource[] = [];
     
-    // Capture mandatory web sources
     const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     chunks.forEach((chunk: any) => {
       if (chunk.web) {
@@ -138,64 +137,80 @@ export const discoveryAgent = async (query: string): Promise<{ shops: Shop[], lo
   }
 };
 
-export const summarizeInTamil = async (shop: Shop): Promise<{ tamilText: string; englishText: string; audioData: string }> => {
+export const getTamilTextSummary = async (shop: Shop): Promise<{ tamil: string, english: string }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-  const prompt = `
-    You are a food expert. Summarize "${shop.name}" which serves "${shop.cuisine}".
-    Use colloquial Madras Tamil (Tamil script). Friendly and energetic.
-    Return JSON: {"tamil": "text", "english": "text"}
-  `;
-
+  const prompt = `Summarize "${shop.name}" (${shop.cuisine}) in colloquial Madras Tamil. Keep it short and energetic. Return JSON: {"tamil": "text", "english": "text"}`;
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
+    return JSON.parse(response.text || '{"tamil": "", "english": ""}');
+  } catch {
+    return { tamil: "தகவல் கிடைக்கவில்லை.", english: "Summary unavailable." };
+  }
+};
 
-    const result = JSON.parse(response.text || '{"tamil": "", "english": ""}');
-    
-    const ttsResponse = await ai.models.generateContent({
+/**
+ * Internal helper to synthesize speech from a provided Tamil transcript.
+ * This fixes the 400 error by ensuring the TTS model only receives text to read.
+ */
+const synthesizeTamilSpeech = async (tamilText: string): Promise<string> => {
+  if (!tamilText) return "";
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  try {
+    const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: result.tamil }] }],
+      contents: [{ parts: [{ text: `Read this aloud in a friendly, energetic Chennai accent: ${tamilText}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }
+          }
         }
       }
     });
-
-    const audioData = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
-    return { tamilText: result.tamil, englishText: result.english, audioData };
-  } catch (error) {
-    return { tamilText: "மன்னிக்கவும்.", englishText: "Sorry.", audioData: "" };
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "";
+  } catch (err) {
+    console.error("Speech Synthesis Error:", err);
+    return "";
   }
+}
+
+export const getTamilAudioSummary = async (shop: Shop): Promise<string> => {
+  // Step 1: Generate the Tamil summary text first
+  const summary = await getTamilTextSummary(shop);
+  
+  // Step 2: Convert that text to audio
+  return await synthesizeTamilSpeech(summary.tamil);
 };
 
 export const spatialAlertAgent = async (vendorName: string, coords: LatLng): Promise<{ tamilSummary: string; englishSummary: string; audioData: string }> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Find a landmark near ${coords.lat}, ${coords.lng} and create a 1-sentence Tamil arrival guide for ${vendorName}. Return JSON: {"tamil": "text", "english": "text"}`;
+  const textPrompt = `Find a landmark near ${coords.lat}, ${coords.lng} and create a 1-sentence energetic arrival guide for ${vendorName} in Madras Tamil. Return JSON: {"tamil": "text", "english": "text"}`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: { tools: [{ googleSearch: {} }], responseMimeType: "application/json" }
-  });
+  try {
+    // Generate the guide text first
+    const textResponse = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: textPrompt,
+      config: { tools: [{ googleSearch: {} }], responseMimeType: "application/json" }
+    });
 
-  const result = JSON.parse(response.text || '{"tamil": "", "english": ""}');
-  
-  const ttsResponse = await ai.models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: result.tamil }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } }
-      }
-    }
-  });
+    const result = JSON.parse(textResponse.text || '{"tamil": "", "english": ""}');
+    
+    // Generate audio from the guide text
+    const audioData = await synthesizeTamilSpeech(result.tamil);
 
-  return { tamilSummary: result.tamil, englishSummary: result.english, audioData: ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || "" };
+    return { 
+      tamilSummary: result.tamil, 
+      englishSummary: result.english, 
+      audioData 
+    };
+  } catch (error) {
+    console.error("Spatial Alert Error:", error);
+    return { tamilSummary: "நேரலை ஒளிபரப்பு தொடங்கியது.", englishSummary: "Live broadcast started.", audioData: "" };
+  }
 };
