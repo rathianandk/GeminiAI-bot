@@ -76,5 +76,6 @@ export interface SpatialAnalytics {
   cuisineDistribution: { label: string; count: number; percentage: number }[];
   priceSpectrum: { range: string; nodes: string[] }[];
   legendaryIndex: { name: string; score: number; reasoning: string }[];
+  customerSegmentation: { segment: string; description: string; volume: number }[];
   sectorSummary: string;
 }

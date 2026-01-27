@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
 import { discoveryAgent, spatialAlertAgent, getTamilTextSummary, getTamilAudioSummary, generateVendorBio, spatialChatAgent, spatialLensAnalysis, generateSpatialAnalytics } from './services/geminiService';
 import { Shop, LatLng, AgentLog, VendorStatus, VendorProfile, MenuItem, ChatMessage, GroundingSource, LensAnalysis, SpatialAnalytics } from './types';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
 const SEED_SHOPS: Shop[] = [
   { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai' },
@@ -22,9 +23,11 @@ const SEED_PROFILES: VendorProfile[] = [
   }
 ];
 
-// --- Global Audio Singleton ---
+// --- Global Audio/Live Helpers ---
 let persistentAudioCtx: AudioContext | null = null;
 let activeVoiceSource: AudioBufferSourceNode | null = null;
+let liveNextStartTime = 0;
+const liveSources = new Set<AudioBufferSourceNode>();
 
 const getAudioCtx = () => {
   if (!persistentAudioCtx) {
@@ -32,6 +35,15 @@ const getAudioCtx = () => {
   }
   return persistentAudioCtx;
 };
+
+function encode(bytes: Uint8Array) {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 function decode(base64: string): Uint8Array {
   const binaryString = atob(base64);
@@ -145,6 +157,10 @@ export default function App() {
   });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
 
+  // Live API Refs
+  const liveSessionRef = useRef<any>(null);
+  const inputAudioCtxRef = useRef<AudioContext | null>(null);
+
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
     setShops(prev => {
@@ -193,6 +209,126 @@ export default function App() {
     } catch (err) { setIsSpeaking(false); setIsVoiceActive(false); }
   };
 
+  const stopLiveSession = () => {
+    if (liveSessionRef.current) {
+      liveSessionRef.current.close();
+      liveSessionRef.current = null;
+    }
+    if (inputAudioCtxRef.current) {
+      inputAudioCtxRef.current.close();
+      inputAudioCtxRef.current = null;
+    }
+    for (const source of liveSources) {
+      try { source.stop(); } catch (e) {}
+    }
+    liveSources.clear();
+    setIsVoiceActive(false);
+    setIsSpeaking(false);
+  };
+
+  const handleBroadcastLive = async () => {
+    const profile = myProfiles.find(p => p.id === activeProfileId);
+    if (!profile) return;
+    setIsSettingUpLive(true);
+
+    try {
+      const alert = await spatialAlertAgent(profile.name, location);
+      if (alert.audioData) await playVoice(alert.audioData);
+
+      // Initialize Gemini Live Session for real-time voice bot interaction
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const outCtx = getAudioCtx();
+      if (outCtx.state === 'suspended') await outCtx.resume();
+
+      const inCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      inputAudioCtxRef.current = inCtx;
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const sessionPromise = ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        callbacks: {
+          onopen: () => {
+            const source = inCtx.createMediaStreamSource(stream);
+            const scriptProcessor = inCtx.createScriptProcessor(4096, 1, 1);
+            scriptProcessor.onaudioprocess = (e) => {
+              const inputData = e.inputBuffer.getChannelData(0);
+              const l = inputData.length;
+              const int16 = new Int16Array(l);
+              for (let i = 0; i < l; i++) int16[i] = inputData[i] * 32768;
+              const b64 = encode(new Uint8Array(int16.buffer));
+              sessionPromise.then(s => s.sendRealtimeInput({ 
+                media: { data: b64, mimeType: 'audio/pcm;rate=16000' } 
+              }));
+            };
+            source.connect(scriptProcessor);
+            scriptProcessor.connect(inCtx.destination);
+            addLog('Spatial', `Live voice link established for ${profile.name}.`, 'resolved');
+          },
+          onmessage: async (msg: LiveServerMessage) => {
+            const b64 = msg.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+            if (b64) {
+              setIsVoiceActive(true);
+              setIsSpeaking(true);
+              liveNextStartTime = Math.max(liveNextStartTime, outCtx.currentTime);
+              const buf = await decodePCM(decode(b64), outCtx, 24000, 1);
+              const src = outCtx.createBufferSource();
+              src.buffer = buf;
+              src.connect(outCtx.destination);
+              src.onended = () => {
+                liveSources.delete(src);
+                if (liveSources.size === 0) setIsSpeaking(false);
+              };
+              src.start(liveNextStartTime);
+              liveNextStartTime += buf.duration;
+              liveSources.add(src);
+            }
+            if (msg.serverContent?.interrupted) {
+              for (const s of liveSources) { s.stop(); liveSources.delete(s); }
+              liveNextStartTime = 0;
+            }
+          },
+          onclose: () => {
+            setIsVoiceActive(false);
+            setIsSpeaking(false);
+          },
+          onerror: (e) => {
+            console.error("Live session error:", e);
+            stopLiveSession();
+          }
+        },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          systemInstruction: `You are the voice of GeoMind AI, supporting the vendor "${profile.name}" at their street food stall. Be helpful, enthusiastic, and provide spatial insights about their location (${location.lat}, ${location.lng}). Help them manage the crowd or describe their menu: ${JSON.stringify(profile.menu)}.`,
+        }
+      });
+
+      liveSessionRef.current = await sessionPromise;
+      setIsVoiceActive(true);
+
+      const liveShop: Shop = { 
+        id: `live-${profile.id}`, 
+        name: profile.name, 
+        coords: location, 
+        isVendor: true, 
+        status: VendorStatus.ONLINE, 
+        emoji: profile.emoji, 
+        cuisine: profile.cuisine, 
+        description: alert.tamilSummary, 
+        hours: profile.hours, 
+        menu: profile.menu 
+      };
+      setShops(prev => [liveShop, ...prev.filter(s => s.id !== liveShop.id && s.id !== profile.id)]);
+      addLog('Spatial', `Broadcasting ${profile.name} live signal. Voice bot active.`, 'resolved');
+    } catch (err) { 
+      setIsVoiceActive(false); 
+      stopLiveSession();
+      addLog('Spatial', 'Failed to establish voice bot signal.', 'failed');
+    } finally { 
+      setIsSettingUpLive(false); 
+    }
+  };
+
   const handleShopSelect = async (shop: Shop) => {
     setActiveShop(shop);
     setLocation(shop.coords);
@@ -219,48 +355,25 @@ export default function App() {
     }
   };
 
-  const computeAnalytics = async () => {
-    if (shops.filter(s => s.id.startsWith('sync')).length === 0) {
-      alert("Please run Food Discovery first to gather data nodes.");
+  // Improved computeAnalytics to accept optional shop data to bypass state race conditions
+  const computeAnalytics = async (shopData?: Shop[]) => {
+    const targetShops = shopData || shops;
+    if (targetShops.filter(s => s.id.startsWith('sync')).length === 0) {
+      addLog('Analytics', 'Insufficient spatial nodes for analytics. Discovery required.', 'failed');
       return;
     }
     setIsAnalyzing(true);
     setExplorerTab('analytics');
-    addLog('Analytics', 'Processing food grid metrics and causal distributions...', 'processing');
+    addLog('Analytics', 'Processing food grid metrics and customer segmentation...', 'processing');
     try {
-      const res = await generateSpatialAnalytics(shops.filter(s => !s.isVendor));
+      const res = await generateSpatialAnalytics(targetShops.filter(s => !s.isVendor));
       setAnalytics(res);
-      addLog('Analytics', 'Spatial visualization manifest generated.', 'resolved');
+      addLog('Analytics', 'Spatial intelligence dashboard synchronized.', 'resolved');
     } catch (err) {
-      addLog('Analytics', 'Telemetry parsing failed. Retrying grid sync...', 'failed');
+      addLog('Analytics', 'Telemetry parsing failed. Visual subsystem offline.', 'failed');
     } finally {
       setIsAnalyzing(false);
     }
-  };
-
-  const handleBroadcastLive = async () => {
-    const profile = myProfiles.find(p => p.id === activeProfileId);
-    if (!profile) return;
-    setIsSettingUpLive(true);
-    setIsVoiceActive(true);
-    try {
-      const alert = await spatialAlertAgent(profile.name, location);
-      if (alert.audioData) playVoice(alert.audioData); else setIsVoiceActive(false);
-      const liveShop: Shop = { 
-        id: `live-${profile.id}`, 
-        name: profile.name, 
-        coords: location, 
-        isVendor: true, 
-        status: VendorStatus.ONLINE, 
-        emoji: profile.emoji, 
-        cuisine: profile.cuisine, 
-        description: alert.tamilSummary, 
-        hours: profile.hours, 
-        menu: profile.menu 
-      };
-      setShops(prev => [liveShop, ...prev.filter(s => s.id !== liveShop.id && s.id !== profile.id)]);
-      addLog('Spatial', `Broadcasting ${profile.name} live signal. Transmission successful.`, 'resolved');
-    } catch (err) { setIsVoiceActive(false); } finally { setIsSettingUpLive(false); }
   };
 
   const syncGPS = () => {
@@ -272,7 +385,7 @@ export default function App() {
   };
 
   const startEditHub = (profile: VendorProfile) => {
-    const [start, end] = profile.hours.split(' - ').map(h => parseInt(h));
+    const [start, end] = (profile.hours || "9:00 - 22:00").split(' - ').map(h => parseInt(h));
     setRegForm({
       name: profile.name,
       cuisine: profile.cuisine,
@@ -280,7 +393,7 @@ export default function App() {
       description: profile.description,
       startHour: start || 9,
       endHour: end || 22,
-      menu: [...profile.menu]
+      menu: [...(profile.menu || [])]
     });
     setIsEditing(true);
     setIsRegistering(true);
@@ -363,11 +476,12 @@ export default function App() {
     addLog('Discovery', 'Initiating wide-band 25-point spatial scrape...', 'processing');
     try {
       const result = await discoveryAgent("Legendary street food and hidden gems", location);
-      setShops(prev => {
-        const otherShops = prev.filter(s => !s.id.startsWith('sync-'));
-        return [...otherShops, ...result.shops];
-      });
+      
+      // Update shops locally for immediate use in analytics
+      const updatedShops = [...shops.filter(s => !s.id.startsWith('sync-')), ...result.shops];
+      setShops(updatedShops);
       setLastSources(result.sources);
+      
       let logIndex = 0;
       const interval = setInterval(() => {
         if (logIndex < result.logs.length) {
@@ -377,7 +491,8 @@ export default function App() {
           clearInterval(interval);
           addLog('Discovery', `Discovery Complete: Identified 25 legends in this sector.`, 'resolved');
           setIsMining(false);
-          setExplorerTab('discovery');
+          // LOOP AUTOMATION: Automatically trigger analytics without manual click
+          computeAnalytics(updatedShops);
         }
       }, 400);
     } catch (err) {
@@ -388,7 +503,6 @@ export default function App() {
 
   const activeProfile = myProfiles.find(p => p.id === activeProfileId);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
-  const liveVendorShops = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
 
   return (
@@ -429,7 +543,7 @@ export default function App() {
                 <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20">
                   {isMining ? <SetupAnimation /> : 'Run Food Scrape'}
                 </button>
-                <button onClick={computeAnalytics} disabled={isAnalyzing || discoveredShops.length === 0} className="py-4 bg-pink-600/20 text-pink-500 border border-pink-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] disabled:opacity-30">
+                <button onClick={() => computeAnalytics()} disabled={isAnalyzing || discoveredShops.length === 0} className="py-4 bg-pink-600/20 text-pink-500 border border-pink-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] disabled:opacity-30">
                   {isAnalyzing ? 'Computing...' : 'Grid Analytics'}
                 </button>
               </div>
@@ -463,9 +577,15 @@ export default function App() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 gap-3 relative z-10">
-                    <button onClick={handleBroadcastLive} disabled={isSettingUpLive} className={`py-4 text-white text-[10px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isCurrentlyLive ? 'bg-indigo-600 shadow-indigo-600/30' : 'bg-emerald-600 shadow-emerald-600/30'}`}>
-                      {isSettingUpLive ? <SetupAnimation /> : (isCurrentlyLive ? 'RE-INITIATE BROADCAST' : 'GO LIVE ON SPATIAL GRID')}
-                    </button>
+                    {isCurrentlyLive ? (
+                      <button onClick={stopLiveSession} className="py-4 bg-rose-600 text-white text-[10px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2">
+                        STOP LIVE VOICE SESSION
+                      </button>
+                    ) : (
+                      <button onClick={handleBroadcastLive} disabled={isSettingUpLive} className="py-4 bg-emerald-600 text-white text-[10px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2">
+                        {isSettingUpLive ? <SetupAnimation /> : 'GO LIVE ON SPATIAL GRID'}
+                      </button>
+                    )}
                     <div className="flex gap-2">
                        <button onClick={() => syncGPS()} disabled={isUpdatingGPS} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">
                          {isUpdatingGPS ? 'Syncing...' : '🛰️ Sync GPS'}
@@ -524,10 +644,29 @@ export default function App() {
                   </div>
                 ) : analytics ? (
                   <div className="space-y-8 pb-10">
+                    {/* Customer Segmentation Section */}
+                    <div className="space-y-4">
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">Customer Segmentation</p>
+                      <div className="grid grid-cols-1 gap-3">
+                        {analytics.customerSegmentation?.map((seg, i) => (
+                          <div key={i} className="p-4 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl space-y-2">
+                             <div className="flex justify-between items-center">
+                                <span className="text-[11px] font-black text-white uppercase tracking-tight">{seg.segment}</span>
+                                <span className="text-[11px] font-black text-emerald-400">{seg.volume}%</span>
+                             </div>
+                             <p className="text-[9px] text-slate-400 leading-tight">"{seg.description}"</p>
+                             <div className="h-1 bg-white/5 rounded-full overflow-hidden mt-1">
+                               <div className="h-full bg-emerald-500" style={{ width: `${seg.volume}%` }}></div>
+                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="space-y-4">
                       <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">Cuisine Diversity Heatmap</p>
                       <div className="space-y-3">
-                        {analytics.cuisineDistribution.map((item, i) => (
+                        {analytics.cuisineDistribution?.map((item, i) => (
                           <div key={i} className="space-y-1">
                             <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
                               <span>{item.label}</span>
@@ -544,7 +683,7 @@ export default function App() {
                     <div className="space-y-4">
                       <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">Legendary Sentiment Index</p>
                       <div className="space-y-3">
-                        {analytics.legendaryIndex.map((item, i) => (
+                        {analytics.legendaryIndex?.map((item, i) => (
                           <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5 group hover:border-pink-500/30 transition-all">
                             <div className="flex justify-between items-center mb-2">
                               <span className="text-[11px] font-black text-white uppercase">{item.name}</span>
@@ -629,7 +768,7 @@ export default function App() {
                   <>
                     {lensTab === 'observations' ? (
                       <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-4">
-                        {lensAnalysis?.observations.map((obs, i) => (
+                        {lensAnalysis?.observations?.map((obs, i) => (
                           <div key={i} className={`p-5 rounded-[1.5rem] bg-white/2 border border-white/5 space-y-2 group transition-all hover:bg-white/5 animate-in fade-in slide-in-from-bottom-4 duration-500`} style={{ animationDelay: `${i * 30}ms` }}>
                             <div className="flex justify-between items-center">
                               <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${
@@ -673,11 +812,6 @@ export default function App() {
                                  View Source Video ↗
                                </a>
                              </div>
-                           </div>
-                           
-                           <div className="pt-4 flex justify-between items-center opacity-30 relative z-10">
-                              <span className="text-[8px] font-black tracking-widest">S_ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</span>
-                              <span className="text-[8px] font-black tracking-widest">V2.5 GRID // STABLE</span>
                            </div>
                         </div>
                       </div>

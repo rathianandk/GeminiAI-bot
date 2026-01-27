@@ -42,7 +42,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   });
 
   const text = response.text;
-  let data = { shops: [], logs: [] };
+  let data: { shops?: any[], logs?: string[] } = { shops: [], logs: [] };
   
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -80,7 +80,8 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
     1. cuisineDistribution: Count and percentage for each cuisine category.
     2. priceSpectrum: Group nodes into "Street (Cheap)", "Mid-Range", and "Premium" based on their descriptions/cuisine.
     3. legendaryIndex: Pick the top 5 most "legendary" nodes and give them a score (1-100) with a brief causal reasoning.
-    4. sectorSummary: A 2-sentence synthesis of the food culture in this grid sector.
+    4. customerSegmentation: Identify the top 4 demographic segments for this specific food grid (e.g., 'Corporate Lunch Seekers', 'Budget Students', 'Late Night Revellers', 'Family Traditionalists'). Provide a percentage volume for each.
+    5. sectorSummary: A 2-sentence synthesis of the food culture in this grid sector.
     
     RETURN ONLY RAW JSON.`,
     config: {
@@ -123,13 +124,25 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
               required: ["name", "score", "reasoning"]
             }
           },
+          customerSegmentation: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                segment: { type: Type.STRING },
+                description: { type: Type.STRING },
+                volume: { type: Type.NUMBER }
+              },
+              required: ["segment", "description", "volume"]
+            }
+          },
           sectorSummary: { type: Type.STRING }
         },
-        required: ["cuisineDistribution", "priceSpectrum", "legendaryIndex", "sectorSummary"]
+        required: ["cuisineDistribution", "priceSpectrum", "legendaryIndex", "customerSegmentation", "sectorSummary"]
       }
     }
   });
-  return JSON.parse(response.text);
+  return JSON.parse(response.text || "{}");
 };
 
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
@@ -158,13 +171,11 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
         properties: {
           observations: { 
             type: Type.ARRAY, 
-            minItems: 25,
-            maxItems: 25,
             items: { 
               type: Type.OBJECT,
               properties: {
                 id: { type: Type.STRING },
-                type: { type: Type.STRING, enum: ['bottleneck', 'flow', 'friction', 'opportunity'] },
+                type: { type: Type.STRING },
                 detail: { type: Type.STRING },
                 causalBottleneck: { type: Type.STRING }
               },
@@ -179,7 +190,7 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
     }
   });
 
-  return JSON.parse(response.text);
+  return JSON.parse(response.text || "{}");
 };
 
 export const getTamilTextSummary = async (shop: Shop) => {
@@ -197,7 +208,7 @@ export const getTamilTextSummary = async (shop: Shop) => {
       }
     }
   });
-  return JSON.parse(response.text);
+  return JSON.parse(response.text || "{}");
 };
 
 export const getTamilAudioSummary = async (shop: Shop) => {
