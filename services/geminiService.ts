@@ -154,7 +154,6 @@ export const getTamilTextSummary = async (shop: Shop): Promise<{ tamil: string, 
 
 /**
  * Internal helper to synthesize speech from a provided Tamil transcript.
- * This fixes the 400 error by ensuring the TTS model only receives text to read.
  */
 const synthesizeTamilSpeech = async (tamilText: string): Promise<string> => {
   if (!tamilText) return "";
@@ -180,10 +179,7 @@ const synthesizeTamilSpeech = async (tamilText: string): Promise<string> => {
 }
 
 export const getTamilAudioSummary = async (shop: Shop): Promise<string> => {
-  // Step 1: Generate the Tamil summary text first
   const summary = await getTamilTextSummary(shop);
-  
-  // Step 2: Convert that text to audio
   return await synthesizeTamilSpeech(summary.tamil);
 };
 
@@ -192,7 +188,6 @@ export const spatialAlertAgent = async (vendorName: string, coords: LatLng): Pro
   const textPrompt = `Find a landmark near ${coords.lat}, ${coords.lng} and create a 1-sentence energetic arrival guide for ${vendorName} in Madras Tamil. Return JSON: {"tamil": "text", "english": "text"}`;
 
   try {
-    // Generate the guide text first
     const textResponse = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: textPrompt,
@@ -200,8 +195,6 @@ export const spatialAlertAgent = async (vendorName: string, coords: LatLng): Pro
     });
 
     const result = JSON.parse(textResponse.text || '{"tamil": "", "english": ""}');
-    
-    // Generate audio from the guide text
     const audioData = await synthesizeTamilSpeech(result.tamil);
 
     return { 
