@@ -5,21 +5,8 @@ export interface LatLng {
 }
 
 export enum VendorStatus {
-  ONLINE = 'ONLINE',
-  OFFLINE = 'OFFLINE'
-}
-
-export interface GroundingSource {
-  title: string;
-  uri: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  sources?: GroundingSource[];
-  isThinking?: boolean;
+  ONLINE = 'online',
+  OFFLINE = 'offline',
 }
 
 export interface MenuItem {
@@ -37,8 +24,6 @@ export interface Shop {
   cuisine?: string;
   description?: string;
   address?: string;
-  sourceUrl?: string;
-  landmarks?: string[];
   menu?: MenuItem[];
   hours?: string;
 }
@@ -51,12 +36,45 @@ export interface VendorProfile {
   description: string;
   lastLocation?: LatLng;
   menu: MenuItem[];
-  hours?: string;
+  hours: string;
 }
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  isThinking?: boolean;
+  sources?: GroundingSource[];
+}
+
+export interface GroundingSource {
+  title: string;
+  uri: string;
+}
+
+export interface LensObservation {
+  id: string;
+  type: 'bottleneck' | 'flow' | 'friction' | 'opportunity';
+  detail: string;
+  causalBottleneck: string;
+}
+
+export interface LensAnalysis {
+  observations: LensObservation[];
+  recommendation: string;
+  videoSource: string;
+}
+
+export interface SpatialAnalytics {
+  cuisineDistribution: { label: string; count: number; percentage: number }[];
+  priceSpectrum: { range: string; nodes: string[] }[];
+  legendaryIndex: { name: string; score: number; reasoning: string }[];
+  sectorSummary: string;
 }

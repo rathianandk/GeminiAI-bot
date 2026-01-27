@@ -1,6 +1,6 @@
 {
-  "name": "GeoMind: Action Era Discovery",
-  "description": "An orchestrated spatial reasoning engine that mines vlogger data and provides landmark-aware live vendor tracking.",
+  "name": "GeoMind: Street Food Intelligence",
+  "description": "A spatial discovery engine for local street food vendors and landmarks.",
   "requestFramePermissions": [
     "camera",
     "microphone",
