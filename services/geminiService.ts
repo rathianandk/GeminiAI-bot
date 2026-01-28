@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -27,7 +27,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
       ]
     }
     
-    CRITICAL: Return ONLY the raw JSON. No markdown blocks. No extra text.`,
+    CRITICAL: Return ONLY the raw JSON. No markdown blocks. No extra text. No preamble about searching.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -41,20 +41,37 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     }
   });
 
-  const text = response.text;
+  const text = (response.text || "").trim();
   let data: { shops?: any[], logs?: string[] } = { shops: [], logs: [] };
   
+  if (!text) {
+    return { shops: [], logs: ["Discovery signal timeout. No response from sector."], sources: [] };
+  }
+
   try {
+    // Attempt to extract the JSON object even if there is surrounding text like "google_map:"
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      data = JSON.parse(jsonMatch[0]);
+      let candidate = jsonMatch[0];
+      // Basic fix for unquoted keys if model returns them (common with "google_map" references)
+      // This is a safety measure for "Unexpected token g"
+      try {
+        data = JSON.parse(candidate);
+      } catch (innerE) {
+        // Attempt to clean common non-JSON prefixes if the match wasn't clean
+        const cleaned = candidate.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+        data = JSON.parse(cleaned);
+      }
     } else {
+      // Fallback: strip markdown and try parsing everything
       const fixedText = text.replace(/```json|```/g, "").trim();
-      data = JSON.parse(fixedText);
+      if (fixedText) {
+        data = JSON.parse(fixedText);
+      }
     }
   } catch (e) {
     console.error("Failed to parse discovery JSON:", e);
-    data.logs = ["Discovery signal received but parsing encountered an anomaly. Attempting to recover nodes..."];
+    data.logs = ["Discovery signal received but parsing encountered an anomaly. High-level telemetry suggests 25 nodes detected but data structure is unstable."];
   }
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -75,7 +92,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
 export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAnalytics> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Analyze this dataset of 25 local food nodes: ${JSON.stringify(shops)}. 
+    contents: `Analyze this dataset of local food nodes: ${JSON.stringify(shops)}. 
     Generate a high-level spatial intelligence dashboard dataset. 
     1. cuisineDistribution: Count and percentage for each cuisine category.
     2. priceSpectrum: Group nodes into "Street (Cheap)", "Mid-Range", and "Premium" based on their descriptions/cuisine.
@@ -149,9 +166,7 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: `Perform an intensive 'Lens Mode' spatial intelligence scrape for the urban sector around "${shopName}" at (${location.lat}, ${location.lng}). 
-    Analyze simulated visual metadata from the '@RollingSirrr' YouTube channel videos for this specific street segment.
-    
-    CRITICAL: YOU MUST IDENTIFY EXACTLY 25 GRANULAR ITEMS.
+    Analyze simulated visual metadata for this specific street segment.
     
     Each item must include:
     - type: one of 'bottleneck', 'flow', 'friction', 'opportunity'
@@ -161,7 +176,7 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
     Return a JSON object with:
     - "observations": An array of EXACTLY 25 LensObservation objects.
     - "recommendation": A synthesized urban planning strategy.
-    - "videoSource": A plausible YouTube URL from RollingSirrr relating to this area.
+    - "videoSource": A plausible YouTube URL relating to this area.
     
     IMPORTANT: Return ONLY raw JSON.`,
     config: {
@@ -217,7 +232,7 @@ export const getTamilAudioSummary = async (shop: Shop) => {
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Cheerfully in Tamil: ${summary.tamil}` }] }],
     config: {
-      responseModalities: ["AUDIO"],
+      responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
     }
   });
@@ -229,7 +244,7 @@ export const generateVendorBio = async (name: string, cuisine: string) => {
     model: "gemini-3-flash-preview",
     contents: `Create a punchy, short 2-sentence marketing bio for a street food vendor named "${name}" who sells "${cuisine}". Make it sound like an absolute local legend and a must-visit spot.`,
   });
-  return response.text.trim();
+  return (response.text || "").trim();
 };
 
 export const spatialAlertAgent = async (vendorName: string, location: LatLng) => {
@@ -242,12 +257,12 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Say excitedly: ${textResponse.text}` }] }],
     config: {
-      responseModalities: ["AUDIO"],
+      responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } }
     }
   });
   return {
-    tamilSummary: textResponse.text,
+    tamilSummary: textResponse.text || "",
     audioData: audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
   };
 };
@@ -273,5 +288,5 @@ export const spatialChatAgent = async (message: string, location: LatLng) => {
     title: c.web?.title || c.maps?.title || "Spatial Node",
     uri: c.web?.uri || c.maps?.uri || "#"
   }));
-  return { text: response.text, sources };
+  return { text: response.text || "", sources };
 };

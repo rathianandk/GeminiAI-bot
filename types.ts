@@ -26,6 +26,7 @@ export interface Shop {
   address?: string;
   menu?: MenuItem[];
   hours?: string;
+  youtubeLink?: string;
 }
 
 export interface VendorProfile {
@@ -37,6 +38,7 @@ export interface VendorProfile {
   lastLocation?: LatLng;
   menu: MenuItem[];
   hours: string;
+  youtubeLink?: string;
 }
 
 export interface AgentLog {
