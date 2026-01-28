@@ -155,6 +155,7 @@ export default function App() {
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
   const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'analytics'>('discovery');
+  const [discoverySubTab, setDiscoverySubTab] = useState<'intelligence' | 'nodes'>('intelligence');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -490,6 +491,7 @@ export default function App() {
   const startDiscovery = async () => {
     setIsMining(true);
     setExplorerTab('discovery');
+    setDiscoverySubTab('intelligence');
     addLog('Discovery', 'Initiating wide-band 25-point spatial scrape...', 'processing');
     try {
       const result = await discoveryAgent("Legendary street food and hidden gems", location);
@@ -816,7 +818,7 @@ export default function App() {
             <>
               <div className="flex justify-between items-center px-1 mb-2 shrink-0">
                 <span className="text-[11px] font-black text-cyan-400 uppercase tracking-[0.3em] drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
-                  {explorerTab === 'discovery' ? `Spatial Intelligence Hub` : 
+                  {explorerTab === 'discovery' ? `Legends Discovery Hub` : 
                    explorerTab === 'logs' ? `Total Intel: ${logs.length}` : 
                    explorerTab === 'live_vendors' ? `Live Signals: ${liveVendors.length}` : 
                    explorerTab === 'lens' ? `Visual Observation Nodes` : ''}
@@ -853,110 +855,142 @@ export default function App() {
                           </p>
                         </div>
                       </div>
-                    ) : isAnalyzing ? (
-                      <div className="py-12 flex flex-col items-center justify-center gap-4 bg-white/2 rounded-3xl border border-white/5 animate-pulse">
-                        <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-                        <p className="text-[10px] font-black uppercase text-indigo-500/60 tracking-widest">Synthesizing Visual Grid...</p>
-                      </div>
-                    ) : analytics ? (
-                      <div className="space-y-8 animate-in fade-in duration-700">
-                        <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden group">
-                           <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,1)]"></div>
-                           <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
-                           <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-indigo-50 transition-colors">"{analytics.sectorSummary}"</p>
+                    ) : (
+                      <>
+                        <div className="flex gap-1 bg-white/5 p-1 rounded-xl shrink-0">
+                          <button 
+                            onClick={() => setDiscoverySubTab('intelligence')} 
+                            className={`flex-1 py-2.5 text-[8px] font-black uppercase rounded-lg transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-white/20 hover:text-white/40'}`}
+                          >
+                            Spatial Intelligence
+                          </button>
+                          <button 
+                            onClick={() => setDiscoverySubTab('nodes')} 
+                            className={`flex-1 py-2.5 text-[8px] font-black uppercase rounded-lg transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-white/20 hover:text-white/40'}`}
+                          >
+                            Identified Nodes
+                          </button>
                         </div>
 
-                        {/* Cuisine Distribution */}
-                        <div className="space-y-4">
-                          <p className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.4em] drop-shadow-md">Cuisine Proliferation</p>
-                          <div className="space-y-3">
-                            {analytics.cuisineDistribution?.map((c, i) => (
-                              <div key={i} className="space-y-1.5">
-                                <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
-                                  <span className="text-white">{c.label}</span>
-                                  <span className="text-indigo-400">{c.percentage}%</span>
-                                </div>
-                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] animate-grow" style={{ width: `${c.percentage}%` }}></div>
-                                </div>
-                              </div>
-                            ))}
+                        {isAnalyzing ? (
+                          <div className="py-12 flex flex-col items-center justify-center gap-4 bg-white/2 rounded-3xl border border-white/5 animate-pulse">
+                            <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                            <p className="text-[10px] font-black uppercase text-indigo-500/60 tracking-widest">Synthesizing Visual Grid...</p>
                           </div>
-                        </div>
+                        ) : discoverySubTab === 'intelligence' ? (
+                          analytics ? (
+                            <div className="space-y-8 animate-in fade-in duration-700">
+                              <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,1)]"></div>
+                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
+                                <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-indigo-50 transition-colors">"{analytics.sectorSummary}"</p>
+                              </div>
 
-                        {/* Price Spectrum */}
-                        <div className="space-y-4">
-                          <p className="text-[10px] font-black text-emerald-400/80 uppercase tracking-[0.4em] drop-shadow-md">Energy Cost Spectrum</p>
-                          <div className="grid grid-cols-1 gap-3">
-                            {analytics.priceSpectrum?.map((p, i) => (
-                              <div key={i} className="p-4 bg-emerald-600/5 border border-emerald-500/10 rounded-2xl space-y-2 group hover:bg-emerald-600/10 transition-all">
-                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{p.range} Tier</span>
-                                <div className="flex flex-wrap gap-2">
-                                  {p.nodes.map((node, j) => (
-                                    <span key={j} className="text-[8px] bg-white/5 px-2 py-1 rounded-md text-white/60 border border-white/5">{node}</span>
+                              {/* Cuisine Distribution */}
+                              <div className="space-y-4">
+                                <p className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.4em] drop-shadow-md">Cuisine Proliferation</p>
+                                <div className="space-y-3">
+                                  {analytics.cuisineDistribution?.map((c, i) => (
+                                    <div key={i} className="space-y-1.5">
+                                      <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
+                                        <span className="text-white">{c.label}</span>
+                                        <span className="text-indigo-400">{c.percentage}%</span>
+                                      </div>
+                                      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                        <div className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] animate-grow" style={{ width: `${c.percentage}%` }}></div>
+                                      </div>
+                                    </div>
                                   ))}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Legendary Index */}
-                        <div className="space-y-4">
-                          <p className="text-[10px] font-black text-amber-400/80 uppercase tracking-[0.4em] drop-shadow-md">High-Sentiment Legends</p>
-                          <div className="space-y-3">
-                            {analytics.legendaryIndex?.map((l, i) => (
-                              <div key={i} className="p-4 bg-amber-600/5 border border-amber-500/10 rounded-2xl flex items-center justify-between group hover:bg-amber-600/10 transition-all">
-                                <div className="space-y-1">
-                                  <p className="text-[11px] font-black text-white uppercase tracking-tight">{l.name}</p>
-                                  <p className="text-[8px] text-amber-200/40 italic">"{l.reasoning}"</p>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-xl font-black text-amber-400 tabular-nums">{l.score}</span>
-                                  <span className="text-[7px] block font-black text-amber-600 uppercase">Power</span>
+                              {/* Price Spectrum */}
+                              <div className="space-y-4">
+                                <p className="text-[10px] font-black text-emerald-400/80 uppercase tracking-[0.4em] drop-shadow-md">Energy Cost Spectrum</p>
+                                <div className="grid grid-cols-1 gap-3">
+                                  {analytics.priceSpectrum?.map((p, i) => (
+                                    <div key={i} className="p-4 bg-emerald-600/5 border border-emerald-500/10 rounded-2xl space-y-2 group hover:bg-emerald-600/10 transition-all">
+                                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{p.range} Tier</span>
+                                      <div className="flex flex-wrap gap-2">
+                                        {p.nodes.map((node, j) => (
+                                          <span key={j} className="text-[8px] bg-white/5 px-2 py-1 rounded-md text-white/60 border border-white/5">{node}</span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Segmentation */}
-                        <div className="space-y-4">
-                          <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
-                          <div className="grid grid-cols-1 gap-3">
-                            {analytics.customerSegmentation?.map((seg, i) => (
-                              <div key={i} className="p-4 bg-cyan-600/5 border border-cyan-500/10 rounded-2xl space-y-2 group hover:bg-cyan-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
-                                 <div className="flex justify-between items-center">
-                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover:text-cyan-300 transition-colors">{seg.segment}</span>
-                                    <span className="text-[11px] font-black text-cyan-400">{seg.volume}%</span>
-                                 </div>
-                                 <p className="text-[9px] text-slate-400 leading-tight">"{seg.description}"</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                    
-                    {!isMining && (
-                      <div className="space-y-4 pt-6">
-                        <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
-                        <div className="space-y-4 pb-20">
-                          {discoveredShops.map((s, i) => (
-                            <button key={s.id} onClick={() => handleShopSelect(s)} className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group shadow-inner flex items-center gap-5 animate-in slide-in-from-bottom-2 duration-500 active:scale-[0.96] hover:border-cyan-500/50 relative overflow-hidden backdrop-blur-md animate-neon-pulse" style={{ animationDelay: `${i * 30}ms` }}>
-                              <div className="shrink-0 w-16 h-16 bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 rounded-[1.25rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-12 group-hover:bg-cyan-600/30 transition-all duration-500 border border-indigo-500/30 group-hover:border-cyan-400 shadow-2xl relative z-10 overflow-hidden">
-                                <span className="relative z-20 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">{s.emoji}</span>
-                              </div>
-                              <div className="flex-1 min-w-0 z-10 space-y-2">
-                                <p className="text-[15px] font-black text-white uppercase group-hover:text-cyan-300 transition-colors truncate tracking-tighter leading-none">{s.name}</p>
-                                <div className="flex items-center gap-3">
-                                  <p className="text-[10px] text-indigo-400/60 group-hover:text-cyan-400/80 font-black uppercase truncate tracking-[0.2em] transition-colors">{s.cuisine}</p>
+                              {/* Legendary Index */}
+                              <div className="space-y-4">
+                                <p className="text-[10px] font-black text-amber-400/80 uppercase tracking-[0.4em] drop-shadow-md">High-Sentiment Legends</p>
+                                <div className="space-y-3">
+                                  {analytics.legendaryIndex?.map((l, i) => (
+                                    <div key={i} className="p-4 bg-amber-600/5 border border-amber-500/10 rounded-2xl flex items-center justify-between group hover:bg-amber-600/10 transition-all">
+                                      <div className="space-y-1">
+                                        <p className="text-[11px] font-black text-white uppercase tracking-tight">{l.name}</p>
+                                        <p className="text-[8px] text-amber-200/40 italic">"{l.reasoning}"</p>
+                                      </div>
+                                      <div className="text-right">
+                                        <span className="text-xl font-black text-amber-400 tabular-nums">{l.score}</span>
+                                        <span className="text-[7px] block font-black text-amber-600 uppercase">Power</span>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+
+                              {/* Segmentation */}
+                              <div className="space-y-4">
+                                <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
+                                <div className="grid grid-cols-1 gap-3">
+                                  {analytics.customerSegmentation?.map((seg, i) => (
+                                    <div key={i} className="p-4 bg-cyan-600/5 border border-cyan-500/10 rounded-2xl space-y-2 group hover:bg-cyan-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
+                                       <div className="flex justify-between items-center">
+                                          <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover:text-cyan-300 transition-colors">{seg.segment}</span>
+                                          <span className="text-[11px] font-black text-cyan-400">{seg.volume}%</span>
+                                       </div>
+                                       <p className="text-[9px] text-slate-400 leading-tight">"{seg.description}"</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="py-20 text-center opacity-40 animate-in fade-in duration-700">
+                              <p className="text-4xl mb-4">📍</p>
+                              <p className="text-[10px] font-black uppercase tracking-widest">No Spatial Data Scraped Yet.</p>
+                              <p className="text-[8px] font-bold mt-2 uppercase text-indigo-400/60 leading-relaxed">Run a Food Scrape to populate<br/>sector intelligence cards.</p>
+                            </div>
+                          )
+                        ) : (
+                          <div className="space-y-4 pt-6 animate-in fade-in duration-500">
+                            <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
+                            <div className="space-y-4 pb-20">
+                              {discoveredShops.length > 0 ? (
+                                discoveredShops.map((s, i) => (
+                                  <button key={s.id} onClick={() => handleShopSelect(s)} className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group shadow-inner flex items-center gap-5 animate-in slide-in-from-bottom-2 duration-500 active:scale-[0.96] hover:border-cyan-500/50 relative overflow-hidden backdrop-blur-md animate-neon-pulse" style={{ animationDelay: `${i * 30}ms` }}>
+                                    <div className="shrink-0 w-16 h-16 bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 rounded-[1.25rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-12 group-hover:bg-cyan-600/30 transition-all duration-500 border border-indigo-500/30 group-hover:border-cyan-400 shadow-2xl relative z-10 overflow-hidden">
+                                      <span className="relative z-20 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">{s.emoji}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0 z-10 space-y-2">
+                                      <p className="text-[15px] font-black text-white uppercase group-hover:text-cyan-300 transition-colors truncate tracking-tighter leading-none">{s.name}</p>
+                                      <div className="flex items-center gap-3">
+                                        <p className="text-[10px] text-indigo-400/60 group-hover:text-cyan-400/80 font-black uppercase truncate tracking-[0.2em] transition-colors">{s.cuisine}</p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="py-20 text-center opacity-40 animate-in fade-in duration-700">
+                                  <p className="text-4xl mb-4">🔍</p>
+                                  <p className="text-[10px] font-black uppercase tracking-widest">No nodes identified yet.</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : explorerTab === 'lens' ? (
