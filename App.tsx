@@ -1285,29 +1285,29 @@ export default function App() {
 
         {activeShop && !isOrdering && (
           <div className={`absolute bottom-10 left-10 right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700 transition-all`}>
-            <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col gap-6 md:gap-8 max-h-[85vh] overflow-hidden relative border-t-white/20">
+            <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col gap-4 md:gap-6 max-h-[85vh] overflow-hidden relative border-t-white/20">
               <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 transition-colors shadow-xl z-20">✕</button>
-              <div className="flex flex-col md:flex-row gap-6 md:gap-10 overflow-y-auto custom-scrollbar pr-2">
-                <div className="text-7xl md:text-8xl bg-white/5 p-8 rounded-[2.5rem] border border-white/5 h-fit shadow-2xl group transition-all duration-700 mx-auto md:mx-0 shrink-0">
+              <div className="flex flex-col md:flex-row gap-4 md:gap-8 overflow-y-auto custom-scrollbar pr-2">
+                <div className="text-6xl md:text-7xl bg-white/5 p-6 rounded-[2.5rem] border border-white/5 h-fit shadow-2xl group transition-all duration-700 mx-auto md:mx-0 shrink-0">
                    <div className="group-hover:scale-110 transition-transform cursor-default">{activeShop.emoji}</div>
                 </div>
-                <div className="flex-1 space-y-4 md:space-y-6 min-w-0">
+                <div className="flex-1 space-y-3 md:space-y-4 min-w-0">
                   <div className="flex justify-between items-start gap-4">
                     <div className="space-y-1">
-                      <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-tight truncate">{activeShop.name}</h3>
-                      <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.2em] mt-2">{activeShop.cuisine}</p>
+                      <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight leading-tight truncate">{activeShop.name}</h3>
+                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mt-1">{activeShop.cuisine}</p>
                     </div>
                     <div className="shrink-0">
                       <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
                     </div>
                   </div>
-                  <div className="bg-white/5 border border-white/5 p-5 md:p-6 rounded-[1.5rem] italic relative overflow-hidden shadow-inner max-h-[160px] overflow-y-auto custom-scrollbar">
-                    <p className="text-base md:text-lg text-white leading-relaxed font-semibold">"{activeShop.description}"</p>
+                  <div className="bg-white/5 border border-white/5 p-4 md:p-5 rounded-[1.25rem] italic relative overflow-hidden shadow-inner max-h-[100px] overflow-y-auto custom-scrollbar">
+                    <p className="text-sm md:text-base text-white leading-relaxed font-semibold line-clamp-2">"{activeShop.description}"</p>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-8 py-5 bg-white text-black text-[12px] font-black uppercase rounded-[1.5rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-3 active:scale-95">🛰️ Navigate</a>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[11px] font-black uppercase rounded-[1.25rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-3 active:scale-95">🛰️ Navigate</a>
                     {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
-                      <button onClick={initiateOrder} className="flex-1 py-5 bg-emerald-600 text-white text-[12px] font-black uppercase rounded-[1.5rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-3 active:scale-95 border border-emerald-400/20">🛒 Order Now</button>
+                      <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[11px] font-black uppercase rounded-[1.25rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-3 active:scale-95 border border-emerald-400/20">🛒 Order Now</button>
                     )}
                   </div>
                 </div>
