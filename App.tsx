@@ -683,9 +683,9 @@ export default function App() {
                           </div>
                         </div>
                         
-                        {/* Hover-only accessory */}
+                        {/* Hover-only accessory replaced with a chevron */}
                         <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl border border-indigo-500/10 group-hover:border-cyan-500/40 group-hover:bg-cyan-500/10 transition-all opacity-20 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0">
-                           <span className="text-cyan-400 text-xl font-light">›</span>
+                           <span className="text-cyan-400 text-2xl font-light">❯</span>
                         </div>
 
                         {/* Corner Accents */}
