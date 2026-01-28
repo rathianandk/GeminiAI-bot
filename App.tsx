@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
 import { 
@@ -8,6 +7,7 @@ import {
   getTamilAudioSummary, 
   generateVendorBio, 
   spatialChatAgent, 
+  spatialChatAgent as chatAgent, 
   spatialLensAnalysis, 
   generateSpatialAnalytics,
   getFlavorGenealogy,
@@ -115,17 +115,16 @@ const VoiceWave = ({ isActive, isSpeaking, onStop }: { isActive: boolean; isSpea
     : ["from-indigo-600 via-purple-600 to-blue-400", "from-purple-500 via-blue-600 to-indigo-400", "from-blue-400 via-white to-purple-400"];
   const glow = isSpeaking ? "bg-emerald-500/20" : "bg-indigo-500/20";
   return (
-    <div className="relative flex items-center justify-center w-16 h-16 overflow-visible animate-in fade-in zoom-in-95 duration-1000">
-      <div className={`absolute inset-[-4px] ${glow} rounded-full blur-3xl animate-pulse transition-colors duration-700`}></div>
-      <div className={`absolute inset-0 bg-gradient-to-tr ${palette[0]} opacity-90 blur-xl animate-siri-liquid mix-blend-screen transition-all duration-700`}></div>
-      <div className={`absolute inset-1 bg-gradient-to-bl ${palette[1]} opacity-90 blur-lg animate-siri-liquid-alt mix-blend-screen transition-all duration-700`}></div>
-      <div className={`absolute inset-2 bg-gradient-to-r ${palette[2]} opacity-60 blur-md animate-siri-liquid-fast mix-blend-screen transition-all duration-700`}></div>
+    <div className="relative flex items-center justify-center w-12 h-12 overflow-visible animate-in fade-in zoom-in-95 duration-1000">
+      <div className={`absolute inset-[-4px] ${glow} rounded-full blur-2xl animate-pulse transition-colors duration-700`}></div>
+      <div className={`absolute inset-0 bg-gradient-to-tr ${palette[0]} opacity-90 blur-lg animate-siri-liquid mix-blend-screen transition-all duration-700`}></div>
+      <div className={`absolute inset-1 bg-gradient-to-bl ${palette[1]} opacity-90 blur-md animate-siri-liquid-alt mix-blend-screen transition-all duration-700`}></div>
       {onStop && isSpeaking ? (
-        <button onClick={(e) => { e.stopPropagation(); onStop(); }} className="relative z-10 w-8 h-8 bg-black/60 hover:bg-black rounded-full flex items-center justify-center text-white/80 transition-all border border-white/20 hover:scale-110 active:scale-90" title="Stop Audio">
-          <span className="text-[10px]">■</span>
+        <button onClick={(e) => { e.stopPropagation(); onStop(); }} className="relative z-10 w-7 h-7 bg-black/60 hover:bg-black rounded-full flex items-center justify-center text-white/80 transition-all border border-white/20 hover:scale-110 active:scale-90" title="Stop Audio">
+          <span className="text-[9px]">■</span>
         </button>
       ) : (
-        <div className="relative w-5 h-5 bg-white rounded-full shadow-[0_0_20px_rgba(255,255,255,1)] border border-white/40 animate-pulse"></div>
+        <div className="relative w-4 h-4 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,1)] border border-white/40 animate-pulse"></div>
       )}
     </div>
   );
@@ -188,6 +187,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : SEED_PROFILES;
   });
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
+  
+  const activeProfile = myProfiles.find(p => p.id === activeProfileId);
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
@@ -344,14 +346,15 @@ export default function App() {
 
   const computeAnalytics = async (shopData?: Shop[]) => {
     const targetShops = shopData || shops;
-    if (targetShops.filter(s => s.id.startsWith('sync')).length === 0) {
+    const discoveredOnly = targetShops.filter(s => s.id.startsWith('sync'));
+    if (discoveredOnly.length === 0) {
       addLog('Analytics', 'Insufficient spatial nodes for analytics. Discovery required.', 'failed');
       return;
     }
     setIsAnalyzing(true);
     addLog('Analytics', 'Processing food grid metrics and customer segmentation...', 'processing');
     try {
-      const res = await generateSpatialAnalytics(targetShops.filter(s => !s.isVendor));
+      const res = await generateSpatialAnalytics(discoveredOnly);
       setAnalytics(res);
       addLog('Analytics', 'Spatial intelligence dashboard synchronized.', 'resolved');
     } catch (err) {
@@ -543,8 +546,6 @@ export default function App() {
     addLog('Linguistic', `Processing signal: "${textToParse}"`, 'processing');
     try {
       const res = await parseOrderAgent(textToParse, activeShop.menu);
-      
-      // Update cart state with AI results (merge into current cart)
       setCart(prev => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
@@ -552,9 +553,8 @@ export default function App() {
         });
         return next;
       });
-
       addLog('Linguistic', `Manifest updated from voice grid. Added ${res.orderItems.length} entities.`, 'resolved');
-      setOrderInput(''); // Clear input for next command
+      setOrderInput(''); 
     } catch (e) {
       addLog('Linguistic', `Signal decoding failed. Re-state requirements.`, 'failed');
     } finally {
@@ -567,7 +567,6 @@ export default function App() {
       alert("Cart is empty. Select items or state your order.");
       return;
     }
-    // Calculate totals manually from the cart state
     const orderItems = Object.entries(cart).map(([name, quantity]) => {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
       return { name, quantity, price: menuItem?.price || 0 };
@@ -589,7 +588,33 @@ export default function App() {
     }, 4000);
   };
 
-  const activeProfile = myProfiles.find(p => p.id === activeProfileId);
+  // --- Chat Logic ---
+  const handleChatSubmit = async (text: string) => {
+    if (!text.trim()) return;
+    const i = text;
+    setChatInput(''); 
+    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
+    const res = await chatAgent(i, location);
+    setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
+  };
+
+  const handleChatVoice = () => {
+    const R = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!R) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
+    const r = new R();
+    r.lang = chatLang;
+    r.onstart = () => setIsListening(true);
+    r.onend = () => setIsListening(false);
+    r.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript;
+      handleChatSubmit(transcript);
+    };
+    r.start();
+  };
+
   const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
@@ -830,21 +855,77 @@ export default function App() {
                       </div>
                     ) : isAnalyzing ? (
                       <div className="py-12 flex flex-col items-center justify-center gap-4 bg-white/2 rounded-3xl border border-white/5 animate-pulse">
-                        <div className="w-10 h-10 border-4 border-pink-500/20 border-t-pink-500 rounded-full animate-spin"></div>
-                        <p className="text-[10px] font-black uppercase text-pink-500/60 tracking-widest">Synthesizing Visual Grid...</p>
+                        <div className="w-10 h-10 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                        <p className="text-[10px] font-black uppercase text-indigo-500/60 tracking-widest">Synthesizing Visual Grid...</p>
                       </div>
                     ) : analytics ? (
                       <div className="space-y-8 animate-in fade-in duration-700">
-                        <div className="p-6 bg-cyan-950/20 border border-cyan-500/20 rounded-3xl space-y-3 shadow-inner relative overflow-hidden group">
-                           <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>
-                           <p className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Spatial Synthesis</p>
-                           <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-cyan-50 transition-colors">"{analytics.sectorSummary}"</p>
+                        <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden group">
+                           <div className="absolute top-0 left-0 w-1.5 h-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,1)]"></div>
+                           <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
+                           <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-indigo-50 transition-colors">"{analytics.sectorSummary}"</p>
                         </div>
+
+                        {/* Cuisine Distribution */}
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.4em] drop-shadow-md">Cuisine Proliferation</p>
+                          <div className="space-y-3">
+                            {analytics.cuisineDistribution?.map((c, i) => (
+                              <div key={i} className="space-y-1.5">
+                                <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter">
+                                  <span className="text-white">{c.label}</span>
+                                  <span className="text-indigo-400">{c.percentage}%</span>
+                                </div>
+                                <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] animate-grow" style={{ width: `${c.percentage}%` }}></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Price Spectrum */}
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-black text-emerald-400/80 uppercase tracking-[0.4em] drop-shadow-md">Energy Cost Spectrum</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            {analytics.priceSpectrum?.map((p, i) => (
+                              <div key={i} className="p-4 bg-emerald-600/5 border border-emerald-500/10 rounded-2xl space-y-2 group hover:bg-emerald-600/10 transition-all">
+                                <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{p.range} Tier</span>
+                                <div className="flex flex-wrap gap-2">
+                                  {p.nodes.map((node, j) => (
+                                    <span key={j} className="text-[8px] bg-white/5 px-2 py-1 rounded-md text-white/60 border border-white/5">{node}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Legendary Index */}
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-black text-amber-400/80 uppercase tracking-[0.4em] drop-shadow-md">High-Sentiment Legends</p>
+                          <div className="space-y-3">
+                            {analytics.legendaryIndex?.map((l, i) => (
+                              <div key={i} className="p-4 bg-amber-600/5 border border-amber-500/10 rounded-2xl flex items-center justify-between group hover:bg-amber-600/10 transition-all">
+                                <div className="space-y-1">
+                                  <p className="text-[11px] font-black text-white uppercase tracking-tight">{l.name}</p>
+                                  <p className="text-[8px] text-amber-200/40 italic">"{l.reasoning}"</p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-xl font-black text-amber-400 tabular-nums">{l.score}</span>
+                                  <span className="text-[7px] block font-black text-amber-600 uppercase">Power</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Segmentation */}
                         <div className="space-y-4">
                           <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
                           <div className="grid grid-cols-1 gap-3">
                             {analytics.customerSegmentation?.map((seg, i) => (
-                              <div key={i} className="p-4 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl space-y-2 group hover:bg-indigo-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
+                              <div key={i} className="p-4 bg-cyan-600/5 border border-cyan-500/10 rounded-2xl space-y-2 group hover:bg-cyan-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
                                  <div className="flex justify-between items-center">
                                     <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover:text-cyan-300 transition-colors">{seg.segment}</span>
                                     <span className="text-[11px] font-black text-cyan-400">{seg.volume}%</span>
@@ -860,7 +941,7 @@ export default function App() {
                     {!isMining && (
                       <div className="space-y-4 pt-6">
                         <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
-                        <div className="space-y-4">
+                        <div className="space-y-4 pb-20">
                           {discoveredShops.map((s, i) => (
                             <button key={s.id} onClick={() => handleShopSelect(s)} className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group shadow-inner flex items-center gap-5 animate-in slide-in-from-bottom-2 duration-500 active:scale-[0.96] hover:border-cyan-500/50 relative overflow-hidden backdrop-blur-md animate-neon-pulse" style={{ animationDelay: `${i * 30}ms` }}>
                               <div className="shrink-0 w-16 h-16 bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 rounded-[1.25rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-12 group-hover:bg-cyan-600/30 transition-all duration-500 border border-indigo-500/30 group-hover:border-cyan-400 shadow-2xl relative z-10 overflow-hidden">
@@ -1170,27 +1251,29 @@ export default function App() {
 
         {activeShop && !isOrdering && (
           <div className={`absolute bottom-10 left-10 right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700 transition-all`}>
-            <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-10 rounded-[4rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col gap-10 max-h-[85vh] overflow-y-auto custom-scrollbar relative border-t-white/20">
-              <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-10 right-10 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 transition-colors shadow-xl">✕</button>
-              <div className="flex gap-12">
-                <div className="text-9xl bg-white/5 p-10 rounded-[3rem] border border-white/5 h-fit shadow-2xl group transition-all duration-700">
+            <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col gap-6 md:gap-8 max-h-[85vh] overflow-hidden relative border-t-white/20">
+              <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 transition-colors shadow-xl z-20">✕</button>
+              <div className="flex flex-col md:flex-row gap-6 md:gap-10 overflow-y-auto custom-scrollbar pr-2">
+                <div className="text-7xl md:text-8xl bg-white/5 p-8 rounded-[2.5rem] border border-white/5 h-fit shadow-2xl group transition-all duration-700 mx-auto md:mx-0 shrink-0">
                    <div className="group-hover:scale-110 transition-transform cursor-default">{activeShop.emoji}</div>
                 </div>
-                <div className="flex-1 space-y-8">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h3 className="text-5xl font-black text-white uppercase tracking-tight leading-none">{activeShop.name}</h3>
-                      <p className="text-[14px] font-black text-indigo-400 uppercase tracking-[0.5em] mt-4">{activeShop.cuisine}</p>
+                <div className="flex-1 space-y-4 md:space-y-6 min-w-0">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-1">
+                      <h3 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-tight truncate">{activeShop.name}</h3>
+                      <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.2em] mt-2">{activeShop.cuisine}</p>
                     </div>
-                    <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
+                    <div className="shrink-0">
+                      <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
+                    </div>
                   </div>
-                  <div className="bg-white/5 border border-white/5 p-8 rounded-[2.5rem] italic relative overflow-hidden shadow-inner">
-                    <p className="text-xl text-white leading-relaxed font-semibold">"{activeShop.description}"</p>
+                  <div className="bg-white/5 border border-white/5 p-5 md:p-6 rounded-[1.5rem] italic relative overflow-hidden shadow-inner max-h-[160px] overflow-y-auto custom-scrollbar">
+                    <p className="text-base md:text-lg text-white leading-relaxed font-semibold">"{activeShop.description}"</p>
                   </div>
-                  <div className="pt-8 flex gap-4">
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-12 py-7 bg-white text-black text-[14px] font-black uppercase rounded-[2.25rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-4">🛰️ Navigate</a>
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-8 py-5 bg-white text-black text-[12px] font-black uppercase rounded-[1.5rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-3 active:scale-95">🛰️ Navigate</a>
                     {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
-                      <button onClick={initiateOrder} className="flex-1 py-7 bg-emerald-600 text-white text-[14px] font-black uppercase rounded-[2.25rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-4">🛒 Order Now</button>
+                      <button onClick={initiateOrder} className="flex-1 py-5 bg-emerald-600 text-white text-[12px] font-black uppercase rounded-[1.5rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-3 active:scale-95 border border-emerald-400/20">🛒 Order Now</button>
                     )}
                   </div>
                 </div>
@@ -1228,16 +1311,24 @@ export default function App() {
                 ))}
                 <div ref={chatEndRef} />
               </div>
-              <form onSubmit={async (e) => {
-                e.preventDefault(); if (!chatInput.trim()) return;
-                const i = chatInput; setChatInput(''); 
-                setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
-                const res = await spatialChatAgent(i, location);
-                setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
-              }} className="p-10 bg-black/60 border-t border-white/10 flex gap-5">
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Inquire about spatial grid..." className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-8 py-6 text-white outline-none focus:border-indigo-500" />
-                <button type="submit" className="px-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black text-[14px] uppercase">Send</button>
-              </form>
+              <div className="p-10 bg-black/60 border-t border-white/10 flex flex-col gap-4">
+                <div className="flex gap-4 items-center">
+                  <button 
+                    onClick={handleChatVoice} 
+                    className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center transition-all shadow-xl border ${isListening ? 'bg-rose-600 border-rose-500 animate-pulse text-white' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white'}`}
+                    title="Voice Input"
+                  >
+                    <span className="text-2xl">{isListening ? '⏹️' : '🎤'}</span>
+                  </button>
+                  <form onSubmit={(e) => { e.preventDefault(); handleChatSubmit(chatInput); }} className="flex-1 flex gap-4">
+                    <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Inquire about spatial grid..." className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-8 py-6 text-white outline-none focus:border-indigo-500 shadow-inner" />
+                    <button type="submit" className="px-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black text-[14px] uppercase shadow-lg transition-all active:scale-95">Send</button>
+                  </form>
+                </div>
+                {isListening && (
+                  <p className="text-center text-[10px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Listening to Signal...</p>
+                )}
+              </div>
             </div>
           )}
         </div>
