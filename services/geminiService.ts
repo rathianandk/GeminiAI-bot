@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics } from "../types";
+import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -49,21 +49,16 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   }
 
   try {
-    // Attempt to extract the JSON object even if there is surrounding text like "google_map:"
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       let candidate = jsonMatch[0];
-      // Basic fix for unquoted keys if model returns them (common with "google_map" references)
-      // This is a safety measure for "Unexpected token g"
       try {
         data = JSON.parse(candidate);
       } catch (innerE) {
-        // Attempt to clean common non-JSON prefixes if the match wasn't clean
         const cleaned = candidate.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
         data = JSON.parse(cleaned);
       }
     } else {
-      // Fallback: strip markdown and try parsing everything
       const fixedText = text.replace(/```json|```/g, "").trim();
       if (fixedText) {
         data = JSON.parse(fixedText);
@@ -71,7 +66,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     }
   } catch (e) {
     console.error("Failed to parse discovery JSON:", e);
-    data.logs = ["Discovery signal received but parsing encountered an anomaly. High-level telemetry suggests 25 nodes detected but data structure is unstable."];
+    data.logs = ["Discovery signal received but parsing encountered an anomaly."];
   }
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -97,7 +92,7 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
     1. cuisineDistribution: Count and percentage for each cuisine category.
     2. priceSpectrum: Group nodes into "Street (Cheap)", "Mid-Range", and "Premium" based on their descriptions/cuisine.
     3. legendaryIndex: Pick the top 5 most "legendary" nodes and give them a score (1-100) with a brief causal reasoning.
-    4. customerSegmentation: Identify the top 4 demographic segments for this specific food grid (e.g., 'Corporate Lunch Seekers', 'Budget Students', 'Late Night Revellers', 'Family Traditionalists'). Provide a percentage volume for each.
+    4. customerSegmentation: Identify the top 4 demographic segments for this specific food grid.
     5. sectorSummary: A 2-sentence synthesis of the food culture in this grid sector.
     
     RETURN ONLY RAW JSON.`,
@@ -162,6 +157,98 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
   return JSON.parse(response.text || "{}");
 };
 
+export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGenealogy> => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: `MISSION: CROSS-TEMPORAL FLAVOR REASONING for location (${location.lat}, ${location.lng}).
+    
+    SIMULATE DEEP REASONING OVER 1M+ TOKENS OF HISTORICAL ARCHIVES:
+    - Pre-colonial staples (fermented batter, steamed foods).
+    - 18th-century spice trade records and colonial manifests.
+    - 20th-century post-war culinary migration and displacement recipes.
+    - Modern 21st-century tech-sector globalized fusion data.
+    
+    ANALYZE:
+    1. How dominant flavors (Spicy, Tangy, Sweet, Pungent) evolved over centuries in this exact neighborhood.
+    2. Local favorites and the "Soul" of the area's food history.
+    3. CRITICAL: For Chennai-based coordinates, prioritize foundational staples like IDLY (fermented steamed food) and coastal seafood/fish culture (e.g. Marina Beach influence).
+    4. Distinct eras with specific flavor profiles and context.
+    5. For each era, identify EXACTLY 3 iconic popular food items that define that period in this location.
+    
+    RETURN RAW JSON.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          neighborhood: { type: Type.STRING },
+          summary: { type: Type.STRING },
+          timeline: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                period: { type: Type.STRING },
+                profile: { type: Type.STRING },
+                description: { type: Type.STRING },
+                notableIngredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+                popularItems: { type: Type.ARRAY, items: { type: Type.STRING } },
+                historicalContext: { type: Type.STRING }
+              },
+              required: ["period", "profile", "description", "notableIngredients", "popularItems", "historicalContext"]
+            }
+          }
+        },
+        required: ["neighborhood", "summary", "timeline"]
+      }
+    }
+  });
+  return JSON.parse(response.text || "{}");
+};
+
+export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `EXTRACT ORDER ITEMS FROM USER INPUT.
+    
+    USER INPUT: "${userInput}"
+    SHOP MENU: ${JSON.stringify(menu)}
+    
+    INSTRUCTIONS:
+    1. Identify ONLY the items mentioned in the LATEST USER INPUT provided above. Do NOT include items from previous context.
+    2. Support English and Tamil.
+    3. Tamil quantity mappings: "onnu/onru" = 1, "rendu" = 2, "moonu" = 3, "naalu" = 4, "anju" = 5, "aaru" = 6, "ezhu" = 7, "ettu" = 8, "onbadhu" = 9, "pathu" = 10.
+    4. Map Tamil pronunciations to English menu names (e.g. "biryani" -> "Mutton Biryani" if that's the closest match).
+    5. If an item name is vague, pick the best match from the menu.
+    6. Return a list of items and their individual counts.
+    
+    RETURN RAW JSON matching the responseSchema.`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          orderItems: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                name: { type: Type.STRING },
+                quantity: { type: Type.NUMBER },
+                price: { type: Type.NUMBER }
+              },
+              required: ["name", "quantity", "price"]
+            }
+          },
+          totalPrice: { type: Type.NUMBER }
+        },
+        required: ["orderItems", "totalPrice"]
+      }
+    }
+  });
+  return JSON.parse(response.text || "{\"orderItems\":[], \"totalPrice\":0}");
+};
+
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -170,8 +257,8 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
     
     Each item must include:
     - type: one of 'bottleneck', 'flow', 'friction', 'opportunity'
-    - detail: A specific observation (e.g., "Moped cluster at north entrance")
-    - causalBottleneck: A deep causal analysis (e.g., "Restricts pedestrian throughput by 40% due to lack of dedicated parking bay").
+    - detail: A specific observation
+    - causalBottleneck: A deep causal analysis.
     
     Return a JSON object with:
     - "observations": An array of EXACTLY 25 LensObservation objects.
@@ -242,13 +329,13 @@ export const getTamilAudioSummary = async (shop: Shop) => {
 export const generateVendorBio = async (name: string, cuisine: string) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Create a punchy, short 2-sentence marketing bio for a street food vendor named "${name}" who sells "${cuisine}". Make it sound like an absolute local legend and a must-visit spot.`,
+    contents: `Create a punchy, short 2-sentence marketing bio for a street food vendor named "${name}" who sells "${cuisine}".`,
   });
   return (response.text || "").trim();
 };
 
 export const spatialAlertAgent = async (vendorName: string, location: LatLng) => {
-  const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized, exciting broadcast message in Tamil.`;
+  const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized broadcast message in Tamil.`;
   const textResponse = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
@@ -270,7 +357,7 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
 export const spatialChatAgent = async (message: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `User location: ${location.lat}, ${location.lng}. Inquiry: ${message}. Respond based on real-time spatial data and recent reviews.`,
+    contents: `User location: ${location.lat}, ${location.lng}. Inquiry: ${message}. Respond based on real-time spatial data.`,
     config: { 
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {

@@ -1,9 +1,32 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
-import { discoveryAgent, spatialAlertAgent, getTamilTextSummary, getTamilAudioSummary, generateVendorBio, spatialChatAgent, spatialLensAnalysis, generateSpatialAnalytics } from './services/geminiService';
-import { Shop, LatLng, AgentLog, VendorStatus, VendorProfile, MenuItem, ChatMessage, GroundingSource, LensObservation, LensAnalysis, SpatialAnalytics } from './types';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { 
+  discoveryAgent, 
+  spatialAlertAgent, 
+  getTamilTextSummary, 
+  getTamilAudioSummary, 
+  generateVendorBio, 
+  spatialChatAgent, 
+  spatialLensAnalysis, 
+  generateSpatialAnalytics,
+  getFlavorGenealogy,
+  parseOrderAgent
+} from './services/geminiService';
+import { 
+  Shop, 
+  LatLng, 
+  AgentLog, 
+  VendorStatus, 
+  VendorProfile, 
+  MenuItem, 
+  ChatMessage, 
+  GroundingSource, 
+  LensObservation, 
+  LensAnalysis, 
+  SpatialAnalytics,
+  FlavorGenealogy
+} from './types';
 
 const SEED_SHOPS: Shop[] = [
   { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai' },
@@ -115,7 +138,7 @@ const SetupAnimation = () => (
       <span className="animate-bounce delay-200 duration-700">🍳</span>
       <span className="animate-bounce delay-500 duration-700">🚚</span>
     </div>
-    <span className="text-[7px] font-black uppercase tracking-widest animate-pulse">Scanning Grid...</span>
+    <span className="text-[7px] font-black uppercase tracking-widest animate-pulse">Establishing Link...</span>
   </div>
 );
 
@@ -131,7 +154,7 @@ export default function App() {
   const [isMining, setIsMining] = useState(false);
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
-  const [userMode, setUserMode] = useState<'explorer' | 'vendor'>('explorer');
+  const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
   const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'analytics'>('discovery');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -148,6 +171,17 @@ export default function App() {
   const [isLensAnalyzing, setIsLensAnalyzing] = useState(false);
   const [lensAnalysis, setLensAnalysis] = useState<LensAnalysis | null>(null);
   const [lensTab, setLensTab] = useState<'observations' | 'synthesis'>('observations');
+
+  const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
+  const [isHistoryMining, setIsHistoryMining] = useState(false);
+
+  // --- Ordering Flow States ---
+  const [isOrdering, setIsOrdering] = useState(false);
+  const [orderStep, setOrderStep] = useState<'menu' | 'verifying' | 'placed'>('menu');
+  const [orderInput, setOrderInput] = useState('');
+  const [parsedOrder, setParsedOrder] = useState<{ orderItems: any[], totalPrice: number } | null>(null);
+  const [isParsingOrder, setIsParsingOrder] = useState(false);
+  const [cart, setCart] = useState<Record<string, number>>({});
 
   const [myProfiles, setMyProfiles] = useState<VendorProfile[]>(() => {
     const saved = localStorage.getItem('geomind_profiles');
@@ -174,7 +208,8 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
     setShops(prev => {
-      const baseShops = prev.filter(s => !s.isVendor);
+      const baseShops = prev.filter(s => !s.id.startsWith('sync-') && !s.isVendor);
+      const syncShops = prev.filter(s => s.id.startsWith('sync-'));
       const vendorShops = myProfiles.map(p => {
         const liveId = `live-${p.id}`;
         const prevLiveInstance = prev.find(s => s.id === liveId && s.status === VendorStatus.ONLINE);
@@ -192,7 +227,7 @@ export default function App() {
           youtubeLink: p.youtubeLink
         };
       });
-      return [...baseShops, ...vendorShops];
+      return [...baseShops, ...syncShops, ...vendorShops];
     });
   }, [myProfiles]);
 
@@ -292,6 +327,21 @@ export default function App() {
     }
   };
 
+  const fetchFlavorHistory = async () => {
+    setIsHistoryMining(true);
+    setUserMode('history');
+    addLog('Historian', 'Scanning 1.2M historical tokens for culinary migration patterns...', 'processing');
+    try {
+      const result = await getFlavorGenealogy(location);
+      setFlavorHistory(result);
+      addLog('Historian', `Cross-temporal synthesis complete for ${result.neighborhood}.`, 'resolved');
+    } catch (err) {
+      addLog('Historian', 'Anomaly detected in historical records. Registry inaccessible.', 'failed');
+    } finally {
+      setIsHistoryMining(false);
+    }
+  };
+
   const computeAnalytics = async (shopData?: Shop[]) => {
     const targetShops = shopData || shops;
     if (targetShops.filter(s => s.id.startsWith('sync')).length === 0) {
@@ -388,7 +438,7 @@ export default function App() {
         id: newId,
         name: regForm.name,
         cuisine: regForm.cuisine,
-        emoji: regForm.emoji,
+        emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
@@ -461,10 +511,89 @@ export default function App() {
     }
   };
 
+  // --- Order Handling Logic ---
+  const initiateOrder = () => {
+    if (!activeShop?.menu || activeShop.menu.length === 0) {
+      alert("This partner node has no menu registered in the grid.");
+      return;
+    }
+    setOrderStep('menu');
+    setOrderInput('');
+    setParsedOrder(null);
+    setCart({}); // Reset cart
+    setIsOrdering(true);
+  };
+
+  const updateCart = (itemName: string, delta: number) => {
+    setCart(prev => {
+      const current = prev[itemName] || 0;
+      const next = Math.max(0, current + delta);
+      if (next === 0) {
+        const { [itemName]: _, ...rest } = prev;
+        return rest;
+      }
+      return { ...prev, [itemName]: next };
+    });
+  };
+
+  const processOrderInput = async (input?: string) => {
+    const textToParse = input || orderInput;
+    if (!textToParse.trim() || !activeShop?.menu) return;
+    setIsParsingOrder(true);
+    addLog('Linguistic', `Processing signal: "${textToParse}"`, 'processing');
+    try {
+      const res = await parseOrderAgent(textToParse, activeShop.menu);
+      
+      // Update cart state with AI results (merge into current cart)
+      setCart(prev => {
+        const next = { ...prev };
+        res.orderItems.forEach((item: any) => {
+          next[item.name] = (next[item.name] || 0) + item.quantity;
+        });
+        return next;
+      });
+
+      addLog('Linguistic', `Manifest updated from voice grid. Added ${res.orderItems.length} entities.`, 'resolved');
+      setOrderInput(''); // Clear input for next command
+    } catch (e) {
+      addLog('Linguistic', `Signal decoding failed. Re-state requirements.`, 'failed');
+    } finally {
+      setIsParsingOrder(false);
+    }
+  };
+
+  const proceedToVerify = () => {
+    if (Object.keys(cart).length === 0) {
+      alert("Cart is empty. Select items or state your order.");
+      return;
+    }
+    // Calculate totals manually from the cart state
+    const orderItems = Object.entries(cart).map(([name, quantity]) => {
+      const menuItem = activeShop?.menu?.find(m => m.name === name);
+      return { name, quantity, price: menuItem?.price || 0 };
+    });
+    const totalPrice = orderItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+    setParsedOrder({ orderItems, totalPrice });
+    setOrderStep('verifying');
+  };
+
+  const confirmFinalOrder = () => {
+    setOrderStep('placed');
+    addLog('Spatial', `Order transmitted successfully to ${activeShop?.name}. Signal locked.`, 'resolved');
+    setTimeout(() => {
+      setIsOrdering(false);
+      setParsedOrder(null);
+      setOrderInput('');
+      setCart({});
+      setActiveShop(null); // Return to grid
+    }, 4000);
+  };
+
   const activeProfile = myProfiles.find(p => p.id === activeProfileId);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
+  const cartTotalItems = Object.values(cart).reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden selection:bg-indigo-500/30">
@@ -474,6 +603,7 @@ export default function App() {
         @keyframes siri-liquid-fast { 0% { border-radius: 50%; transform: scale(1) rotate(0deg); } 50% { border-radius: 40% 60% 40% 60%; transform: scale(1.2) rotate(180deg); } 100% { border-radius: 50%; transform: scale(1) rotate(360deg); } }
         @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
         @keyframes neon-pulse { 0% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2), 0 0 10px rgba(99, 102, 241, 0.1); } 50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.2); } 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2), 0 0 10px rgba(99, 102, 241, 0.1); } }
+        @keyframes lineFlow { 0% { height: 0; } 100% { height: 100%; } }
         .animate-siri-liquid { animation: siri-liquid 8s linear infinite; }
         .animate-siri-liquid-alt { animation: siri-liquid-alt 12s ease-in-out infinite; }
         .animate-siri-liquid-fast { animation: siri-liquid-fast 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
@@ -491,10 +621,11 @@ export default function App() {
             <div className="flex gap-2">
               <button onClick={() => setUserMode('explorer')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'explorer' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-white/40'}`}>Explorer</button>
               <button onClick={() => setUserMode('vendor')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'vendor' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white/5 text-white/40'}`}>Partner Hub</button>
+              <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
             </div>
           </div>
           
-          {userMode === 'explorer' ? (
+          {(userMode === 'explorer' || userMode === 'history') ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20">
@@ -505,10 +636,10 @@ export default function App() {
                 </button>
               </div>
               <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
-                <button onClick={() => setExplorerTab('logs')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${explorerTab === 'logs' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Intel</button>
-                <button onClick={() => setExplorerTab('discovery')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Legends</button>
-                <button onClick={() => setExplorerTab('lens')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${explorerTab === 'lens' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Lens</button>
-                <button onClick={() => setExplorerTab('live_vendors')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${explorerTab === 'live_vendors' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Partners</button>
+                <button onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Intel</button>
+                <button onClick={() => { setUserMode('explorer'); setExplorerTab('discovery'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Legends</button>
+                <button onClick={() => { setUserMode('explorer'); setExplorerTab('lens'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Lens</button>
+                <button onClick={() => { setUserMode('explorer'); setExplorerTab('live_vendors'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'live_vendors' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Partners</button>
               </div>
             </div>
           ) : (
@@ -571,229 +702,409 @@ export default function App() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-          <div className="flex justify-between items-center px-1 mb-2 shrink-0">
-            <span className="text-[11px] font-black text-cyan-400 uppercase tracking-[0.3em] drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
-              {explorerTab === 'discovery' ? `Spatial Intelligence Hub` : 
-               explorerTab === 'logs' ? `Total Intel: ${logs.length}` : 
-               explorerTab === 'live_vendors' ? `Live Signals: ${liveVendors.length}` : 
-               explorerTab === 'lens' ? `Visual Observation Nodes` : ''}
-            </span>
-          </div>
-
-          {userMode === 'explorer' ? (
-            explorerTab === 'logs' ? (
-              <div className="space-y-4">
-                {logs.map(l => (
-                  <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300 shadow-sm">
-                    <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : l.agent === 'Discovery' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Lens' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
-                    <p className="text-[10px] font-bold text-slate-400 leading-relaxed mt-2 whitespace-pre-line tracking-tight">{l.message}</p>
-                  </div>
-                ))}
+          {userMode === 'history' ? (
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-700">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em] drop-shadow-[0_0_12px_rgba(245,158,11,0.5)]">
+                  Cross-Temporal Synthesis
+                </span>
+                <button onClick={() => setUserMode('explorer')} className="text-[9px] font-black text-white hover:text-amber-400 uppercase transition-colors bg-white/10 px-3 py-1.5 rounded-lg border border-white/5">Back to Grid</button>
               </div>
-            ) : explorerTab === 'discovery' ? (
-              <div className="space-y-6">
-                {/* Visual Intelligence Section */}
-                {isAnalyzing ? (
-                  <div className="py-12 flex flex-col items-center justify-center gap-4 bg-white/2 rounded-3xl border border-white/5 animate-pulse">
-                    <div className="w-10 h-10 border-4 border-pink-500/20 border-t-pink-500 rounded-full animate-spin"></div>
-                    <p className="text-[10px] font-black uppercase text-pink-500/60 tracking-widest">Synthesizing Visual Grid...</p>
+
+              {isHistoryMining ? (
+                <div className="py-20 flex flex-col items-center justify-center space-y-6">
+                  <div className="relative w-32 h-32">
+                    <div className="absolute inset-0 bg-amber-500/10 rounded-full animate-ping"></div>
+                    <div className="absolute inset-4 bg-amber-500/20 rounded-full animate-pulse"></div>
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl">🕰️</div>
                   </div>
-                ) : analytics ? (
-                  <div className="space-y-8 animate-in fade-in duration-700">
-                    <div className="p-6 bg-cyan-950/20 border border-cyan-500/20 rounded-3xl space-y-3 shadow-inner relative overflow-hidden group">
-                       <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>
-                       <p className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Spatial Synthesis</p>
-                       <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-cyan-50 transition-colors">"{analytics.sectorSummary}"</p>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
-                      <div className="grid grid-cols-1 gap-3">
-                        {analytics.customerSegmentation?.map((seg, i) => (
-                          <div key={i} className="p-4 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl space-y-2 group hover:bg-indigo-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
-                             <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover:text-cyan-300 transition-colors">{seg.segment}</span>
-                                <span className="text-[11px] font-black text-cyan-400">{seg.volume}%</span>
-                             </div>
-                             <p className="text-[9px] text-slate-400 leading-tight">"{seg.description}"</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Cuisine Heatmap</p>
-                      <div className="space-y-3">
-                        {analytics.cuisineDistribution?.map((item, i) => (
-                          <div key={i} className="space-y-1">
-                            <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                              <span className="group-hover:text-cyan-300 transition-colors">{item.label}</span>
-                              <span className="text-cyan-400">{item.percentage.toFixed(1)}%</span>
-                            </div>
-                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                              <div className="h-full bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)] animate-grow" style={{ width: `${item.percentage}%` }}></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Legendary Sentiment Index</p>
-                      <div className="space-y-3">
-                        {analytics.legendaryIndex?.map((item, i) => (
-                          <div key={i} className="p-4 bg-white/2 rounded-2xl border border-white/5 hover:border-cyan-500/30 hover:bg-cyan-500/5 transition-all group">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-[11px] font-black text-white uppercase group-hover:text-cyan-300 transition-colors">{item.name}</span>
-                              <span className="text-[12px] font-black text-pink-500 group-hover:scale-110 transition-transform">{item.score}</span>
-                            </div>
-                            <p className="text-[9px] text-slate-400 italic">"{item.reasoning}"</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  <p className="text-[11px] font-black text-amber-400 uppercase tracking-[0.5em] text-center animate-pulse leading-loose drop-shadow-lg">
+                    REASONING OVER 1,000,000 HISTORICAL TOKENS...
+                  </p>
+                </div>
+              ) : flavorHistory ? (
+                <div className="space-y-12 pb-20">
+                  <div className="p-6 bg-amber-950/40 border border-amber-500/40 rounded-3xl relative overflow-hidden group shadow-2xl">
+                    <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,1)]"></div>
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-3 group-hover:text-amber-200 transition-colors drop-shadow-md">{flavorHistory.neighborhood} Evolution</h3>
+                    <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{flavorHistory.summary}"</p>
                   </div>
-                ) : null}
 
-                {/* Shop Manifest Section - Cool Cyberpunk Buttons */}
-                <div className="space-y-4 pt-6">
-                  <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
-                  <div className="space-y-4">
-                    {discoveredShops.map((s, i) => (
-                      <button 
-                        key={s.id} 
-                        onClick={() => handleShopSelect(s)} 
-                        className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group shadow-inner flex items-center gap-5 animate-in slide-in-from-bottom-2 duration-500 active:scale-[0.96] hover:border-cyan-500/50 relative overflow-hidden backdrop-blur-md animate-neon-pulse" 
-                        style={{ animationDelay: `${i * 30}ms` }}
-                      >
-                        {/* Dynamic background sweep effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/0 via-cyan-500/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out"></div>
-                        
-                        {/* Icon Container with multi-layered glow */}
-                        <div className="shrink-0 w-16 h-16 bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 rounded-[1.25rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-12 group-hover:bg-cyan-600/30 transition-all duration-500 border border-indigo-500/30 group-hover:border-cyan-400 shadow-2xl relative z-10 overflow-hidden">
-                           <div className="absolute inset-0 bg-indigo-500/10 group-hover:bg-cyan-500/20 animate-pulse"></div>
-                           <span className="relative z-20 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">{s.emoji}</span>
-                        </div>
-                        
-                        <div className="flex-1 min-w-0 z-10 space-y-2">
-                          <p className="text-[15px] font-black text-white uppercase group-hover:text-cyan-300 transition-colors truncate tracking-tighter leading-none">{s.name}</p>
-                          <div className="flex items-center gap-3">
-                             <span className="text-[8px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 group-hover:border-cyan-500/40 group-hover:text-cyan-400 transition-all uppercase tracking-widest font-black">NODE ID: {i+1}</span>
-                             <p className="text-[10px] text-indigo-400/60 group-hover:text-cyan-400/80 font-black uppercase truncate tracking-[0.2em] transition-colors">{s.cuisine}</p>
+                  <div className="relative pl-10 space-y-12">
+                    <div className="absolute left-3 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 via-amber-400/40 to-transparent rounded-full"></div>
+                    {flavorHistory.timeline.map((era, i) => (
+                      <div key={i} className="relative group animate-in slide-in-from-left-4" style={{ animationDelay: `${i * 150}ms` }}>
+                        <div className="absolute -left-10 top-1.5 w-7 h-7 bg-amber-950 border-4 border-amber-400 rounded-full z-10 group-hover:scale-125 transition-transform shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
+                        <div className="space-y-4">
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] block">{era.period}</span>
+                          <div className="flex items-center gap-4">
+                            <h4 className="text-[16px] font-black text-white uppercase group-hover:text-amber-300 transition-colors tracking-tight">{era.profile}</h4>
+                            <div className="h-px flex-1 bg-white/20 group-hover:bg-amber-400/40 transition-all"></div>
+                          </div>
+                          <p className="text-[11px] font-black text-slate-100 leading-relaxed drop-shadow-sm bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
+                          <div className="bg-amber-950/20 p-5 rounded-3xl border border-amber-500/20 space-y-5 group-hover:bg-amber-900/10 transition-all shadow-inner">
+                            {/* Notable Ingredients Section */}
+                            <div className="space-y-3">
+                              <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-1 h-1 bg-amber-400 rounded-full"></span>
+                                Notable Elements
+                              </p>
+                              <div className="flex flex-wrap gap-2.5">
+                                {era.notableIngredients.map((ing, j) => (
+                                  <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase shadow-lg transform hover:scale-105 transition-transform cursor-default">
+                                    {ing}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Popular Food Items Section */}
+                            <div className="space-y-3">
+                              <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                                Iconic Food Items
+                              </p>
+                              <div className="flex flex-wrap gap-2.5">
+                                {era.popularItems.map((item, j) => (
+                                  <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-emerald-400 text-black font-black uppercase shadow-lg transform hover:scale-105 transition-transform cursor-default">
+                                    {item}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                              <p className="text-[10px] text-amber-100 font-bold italic leading-relaxed">
+                                <span className="text-amber-500/80 uppercase tracking-tighter mr-2 not-italic font-black">Context:</span>
+                                {era.historicalContext}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                        
-                        {/* Hover-only accessory replaced with a chevron */}
-                        <div className="shrink-0 flex items-center justify-center w-12 h-12 rounded-2xl border border-indigo-500/10 group-hover:border-cyan-500/40 group-hover:bg-cyan-500/10 transition-all opacity-20 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0">
-                           <span className="text-cyan-400 text-2xl font-light">❯</span>
-                        </div>
-
-                        {/* Corner Accents */}
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-transparent group-hover:border-cyan-500/40 transition-all"></div>
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-transparent group-hover:border-cyan-500/40 transition-all"></div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between items-center px-1 mb-2 shrink-0">
+                <span className="text-[11px] font-black text-cyan-400 uppercase tracking-[0.3em] drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]">
+                  {explorerTab === 'discovery' ? `Spatial Intelligence Hub` : 
+                   explorerTab === 'logs' ? `Total Intel: ${logs.length}` : 
+                   explorerTab === 'live_vendors' ? `Live Signals: ${liveVendors.length}` : 
+                   explorerTab === 'lens' ? `Visual Observation Nodes` : ''}
+                </span>
               </div>
-            ) : explorerTab === 'lens' ? (
-              <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
-                {isLensAnalyzing ? (
-                  <div className="flex-1 flex flex-col items-center justify-center space-y-6 py-20">
-                    <div className="relative w-24 h-24">
-                       <div className="absolute inset-0 border-4 border-indigo-500/20 rounded-full animate-ping"></div>
-                       <div className="absolute inset-0 flex items-center justify-center text-4xl animate-bounce">📡</div>
-                    </div>
-                    <p className="text-[10px] font-black text-indigo-400/60 uppercase tracking-[0.3em] text-center">Processing 25-Point Scrape...</p>
+
+              {userMode === 'explorer' ? (
+                explorerTab === 'logs' ? (
+                  <div className="space-y-4">
+                    {logs.map(l => (
+                      <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300 shadow-sm">
+                        <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : l.agent === 'Discovery' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Lens' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
+                        <p className="text-[10px] font-bold text-slate-400 leading-relaxed mt-2 whitespace-pre-line tracking-tight">{l.message}</p>
+                      </div>
+                    ))}
                   </div>
-                ) : lensAnalysis ? (
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <div className="flex gap-1 bg-white/5 p-1 rounded-xl shrink-0 mb-4">
-                      <button onClick={() => setLensTab('observations')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'observations' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Observations</button>
-                      <button onClick={() => setLensTab('synthesis')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'synthesis' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Synthesis</button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
-                      {lensTab === 'observations' ? (
-                        lensAnalysis.observations.map((obs, i) => (
-                          <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 group hover:bg-white/10 transition-all animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 30}ms` }}>
-                            <div className="flex justify-between items-center">
-                              <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${
-                                obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' :
-                                obs.type === 'flow' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
-                                obs.type === 'friction' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
-                                'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
-                              }`}>{obs.type}</span>
-                            </div>
-                            <h5 className="text-[11px] font-black text-white uppercase">{obs.detail}</h5>
-                            <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="space-y-6 p-2">
-                           <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-3xl space-y-3">
-                             <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Master Strategy</p>
-                             <p className="text-[11px] font-bold text-slate-100 leading-relaxed">"{lensAnalysis.recommendation}"</p>
-                           </div>
+                ) : explorerTab === 'discovery' ? (
+                  <div className="space-y-6">
+                    {isMining ? (
+                      <div className="py-20 flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-500">
+                        <div className="relative w-32 h-32 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-indigo-500/10 rounded-full animate-ping"></div>
+                          <div className="absolute inset-4 bg-indigo-500/20 rounded-full animate-pulse"></div>
+                          <div className="absolute inset-0 border-2 border-dashed border-indigo-500/30 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                          <div className="absolute inset-8 border-2 border-dashed border-cyan-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+                          <div className="relative text-5xl">📡</div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-20 text-center opacity-20">
-                    <p className="text-[10px] font-black uppercase tracking-widest">Lens System Idle.</p>
-                  </div>
-                )}
-              </div>
-            ) : explorerTab === 'live_vendors' ? (
-              <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="space-y-3">
-                  {liveVendors.map((v, i) => (
-                    <button key={v.id} onClick={() => handleShopSelect(v)} className="w-full p-5 rounded-[2rem] bg-emerald-600/5 border border-emerald-500/20 text-left transition-all hover:bg-emerald-600/10 group animate-in slide-in-from-right-4" style={{ animationDelay: `${i * 50}ms` }}>
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">{v.emoji}</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-black text-white uppercase truncate">{v.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                             <p className="text-[9px] text-emerald-400 font-black uppercase tracking-widest">Live Signal</p>
+                        <div className="text-center space-y-2">
+                          <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse leading-loose">
+                            CALIBRATING SPATIAL GRID...
+                          </p>
+                          <p className="text-[8px] font-black text-white/30 uppercase tracking-widest">
+                            EXTRACTING HIGH-SENTIMENT NODES
+                          </p>
+                        </div>
+                      </div>
+                    ) : isAnalyzing ? (
+                      <div className="py-12 flex flex-col items-center justify-center gap-4 bg-white/2 rounded-3xl border border-white/5 animate-pulse">
+                        <div className="w-10 h-10 border-4 border-pink-500/20 border-t-pink-500 rounded-full animate-spin"></div>
+                        <p className="text-[10px] font-black uppercase text-pink-500/60 tracking-widest">Synthesizing Visual Grid...</p>
+                      </div>
+                    ) : analytics ? (
+                      <div className="space-y-8 animate-in fade-in duration-700">
+                        <div className="p-6 bg-cyan-950/20 border border-cyan-500/20 rounded-3xl space-y-3 shadow-inner relative overflow-hidden group">
+                           <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>
+                           <p className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Spatial Synthesis</p>
+                           <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-cyan-50 transition-colors">"{analytics.sectorSummary}"</p>
+                        </div>
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            {analytics.customerSegmentation?.map((seg, i) => (
+                              <div key={i} className="p-4 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl space-y-2 group hover:bg-indigo-600/10 transition-all border-l-4 border-l-cyan-500/40 hover:border-l-cyan-400">
+                                 <div className="flex justify-between items-center">
+                                    <span className="text-[11px] font-black text-white uppercase tracking-tight group-hover:text-cyan-300 transition-colors">{seg.segment}</span>
+                                    <span className="text-[11px] font-black text-cyan-400">{seg.volume}%</span>
+                                 </div>
+                                 <p className="text-[9px] text-slate-400 leading-tight">"{seg.description}"</p>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null
-          ) : (
-            !activeProfileId && myProfiles.map(p => (
-              <div key={p.id} className="w-full p-5 rounded-[2rem] bg-[#0a0a0a] border border-white/10 hover:border-white/20 flex justify-between items-center transition-all group shadow-lg">
-                <div className="flex items-center gap-4">
-                  <span className="text-3xl bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{p.emoji}</span>
-                  <div>
-                    <p className="text-[12px] font-black text-white uppercase leading-none">{p.name}</p>
-                    <p className="text-[9px] text-white/40 font-black uppercase mt-1">{p.cuisine}</p>
+                    ) : null}
+                    
+                    {!isMining && (
+                      <div className="space-y-4 pt-6">
+                        <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
+                        <div className="space-y-4">
+                          {discoveredShops.map((s, i) => (
+                            <button key={s.id} onClick={() => handleShopSelect(s)} className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group shadow-inner flex items-center gap-5 animate-in slide-in-from-bottom-2 duration-500 active:scale-[0.96] hover:border-cyan-500/50 relative overflow-hidden backdrop-blur-md animate-neon-pulse" style={{ animationDelay: `${i * 30}ms` }}>
+                              <div className="shrink-0 w-16 h-16 bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 rounded-[1.25rem] flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-12 group-hover:bg-cyan-600/30 transition-all duration-500 border border-indigo-500/30 group-hover:border-cyan-400 shadow-2xl relative z-10 overflow-hidden">
+                                <span className="relative z-20 drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]">{s.emoji}</span>
+                              </div>
+                              <div className="flex-1 min-w-0 z-10 space-y-2">
+                                <p className="text-[15px] font-black text-white uppercase group-hover:text-cyan-300 transition-colors truncate tracking-tighter leading-none">{s.name}</p>
+                                <div className="flex items-center gap-3">
+                                  <p className="text-[10px] text-indigo-400/60 group-hover:text-cyan-400/80 font-black uppercase truncate tracking-[0.2em] transition-colors">{s.cuisine}</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <button onClick={() => setActiveProfileId(p.id)} className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[9px] font-black uppercase rounded-2xl transition-all shadow-inner">Manage Node</button>
-              </div>
-            ))
+                ) : explorerTab === 'lens' ? (
+                  <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
+                    {isLensAnalyzing ? (
+                      <div className="flex-1 flex flex-col items-center justify-center space-y-6 py-20">
+                        <div className="relative w-24 h-24">
+                           <div className="absolute inset-0 border-4 border-indigo-500/20 rounded-full animate-ping"></div>
+                           <div className="absolute inset-0 flex items-center justify-center text-4xl animate-bounce">📡</div>
+                        </div>
+                        <p className="text-[10px] font-black text-indigo-400/60 uppercase tracking-[0.3em] text-center">Processing 25-Point Scrape...</p>
+                      </div>
+                    ) : lensAnalysis ? (
+                      <div className="flex-1 flex flex-col overflow-hidden">
+                        <div className="flex gap-1 bg-white/5 p-1 rounded-xl shrink-0 mb-4">
+                          <button onClick={() => setLensTab('observations')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'observations' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Observations</button>
+                          <button onClick={() => setLensTab('synthesis')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'synthesis' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Synthesis</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
+                          {lensTab === 'observations' ? (
+                            lensAnalysis.observations.map((obs, i) => (
+                              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 group hover:bg-white/10 transition-all animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 30}ms` }}>
+                                <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : obs.type === 'flow' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>{obs.type}</span>
+                                <h5 className="text-[11px] font-black text-white uppercase">{obs.detail}</h5>
+                                <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="space-y-6 p-2">
+                               <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-3xl space-y-3">
+                                 <p className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">Master Strategy</p>
+                                 <p className="text-[11px] font-bold text-slate-100 leading-relaxed">"{lensAnalysis.recommendation}"</p>
+                               </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="py-20 text-center opacity-20">
+                        <p className="text-[10px] font-black uppercase tracking-widest">Lens System Idle.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : explorerTab === 'live_vendors' ? (
+                  <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="space-y-3">
+                      {liveVendors.map((v, i) => (
+                        <button key={v.id} onClick={() => handleShopSelect(v)} className="w-full p-5 rounded-[2rem] bg-emerald-600/5 border border-emerald-500/20 text-left transition-all hover:bg-emerald-600/10 group animate-in slide-in-from-right-4" style={{ animationDelay: `${i * 50}ms` }}>
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">{v.emoji}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-black text-white uppercase truncate">{v.name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                 <p className="text-[9px] text-emerald-400 font-black uppercase tracking-widest">Live Signal</p>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null
+              ) : (
+                !activeProfileId && myProfiles.map(p => (
+                  <div key={p.id} className="w-full p-5 rounded-[2rem] bg-[#0a0a0a] border border-white/10 hover:border-white/20 flex justify-between items-center transition-all group shadow-lg">
+                    <div className="flex items-center gap-4">
+                      <span className="text-3xl bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{p.emoji}</span>
+                      <div>
+                        <p className="text-[12px] font-black text-white uppercase leading-none">{p.name}</p>
+                        <p className="text-[9px] text-white/40 font-black uppercase mt-1">{p.cuisine}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setActiveProfileId(p.id)} className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[9px] font-black uppercase rounded-2xl transition-all shadow-inner">Manage Node</button>
+                  </div>
+                ))
+              )}
+            </>
           )}
         </div>
       </div>
 
       <div className="flex-1 relative bg-[#020202]">
         <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
+        
+        {/* Ordering Overlay - Enhanced Cart & Language Interaction */}
+        {isOrdering && activeShop && (
+          <div className="absolute inset-0 z-[6000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-8 animate-in fade-in duration-700">
+            <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[4rem] p-16 space-y-12 shadow-[0_50px_150px_rgba(0,0,0,1)] relative border-t-white/20">
+              <button onClick={() => setIsOrdering(false)} className="absolute top-12 right-12 w-14 h-14 flex items-center justify-center bg-white/5 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all text-2xl">✕</button>
+              
+              <div className="flex flex-col items-center gap-6">
+                <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center text-5xl shadow-2xl border border-white/10">{activeShop.emoji}</div>
+                <div className="text-center space-y-2">
+                  <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{activeShop.name}</h2>
+                  <div className="flex items-center justify-center gap-3">
+                    <button onClick={() => setChatLang('en-US')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}>English Mode</button>
+                    <button onClick={() => setChatLang('ta-IN')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/30' : 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'}`}>Tamil Mode (தமிழ்)</button>
+                  </div>
+                </div>
+              </div>
+
+              {orderStep === 'menu' && (
+                <div className="space-y-12 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-1 gap-4 max-h-[350px] overflow-y-auto custom-scrollbar pr-4">
+                    {activeShop.menu?.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-6 bg-white/5 border border-white/5 rounded-[2rem] hover:bg-white/10 transition-all group">
+                        <div className="flex flex-col">
+                          <span className="text-[16px] font-black text-white uppercase tracking-tight">{item.name}</span>
+                          <span className="text-[13px] font-black text-emerald-400 tracking-tighter">₹{item.price}</span>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <button onClick={() => updateCart(item.name, -1)} className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-rose-500/20 border border-white/10 flex items-center justify-center text-xl text-white hover:text-rose-500 transition-all">-</button>
+                          <span className={`text-xl font-black w-8 text-center ${cart[item.name] ? 'text-indigo-400' : 'text-white/20'}`}>{cart[item.name] || 0}</span>
+                          <button onClick={() => updateCart(item.name, 1)} className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-indigo-600/20 border border-white/10 flex items-center justify-center text-xl text-white hover:text-indigo-400 transition-all">+</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Cart Summary */}
+                  {cartTotalItems > 0 && (
+                    <div className="bg-emerald-600/10 border border-emerald-500/20 p-6 rounded-[2rem] flex justify-between items-center animate-in slide-in-from-bottom-2">
+                       <div className="flex gap-2 items-center">
+                         <span className="text-xl">🛒</span>
+                         <span className="text-[12px] font-black text-emerald-400 uppercase">{cartTotalItems} {cartTotalItems === 1 ? 'Item' : 'Items'} Ready</span>
+                       </div>
+                       <button onClick={() => setCart({})} className="text-[10px] font-black text-white/40 hover:text-rose-500 uppercase tracking-widest">Clear All</button>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-6 bg-black/40 p-10 rounded-[3rem] border border-white/5 shadow-inner">
+                    <div className="flex flex-col items-center gap-4 mb-4">
+                       <VoiceWave isActive={isListening || isParsingOrder} isSpeaking={isParsingOrder} />
+                       <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest text-center">
+                         {isParsingOrder ? (chatLang === 'ta-IN' ? "முகவர் உங்கள் ஆர்டரை எழுதுகிறார்..." : "Agent is writing down your order...") : 
+                          isListening ? (chatLang === 'ta-IN' ? "கேட்கிறது..." : "Listening to Signal...") : 
+                          (chatLang === 'ta-IN' ? "உங்கள் ஆர்டரைச் சொல்லுங்கள் (எ.கா. 'biryani rendu venum')" : "State items to ADD via voice (e.g. 'Add 2 Biryanis')")}
+                       </p>
+                    </div>
+                    <div className="flex gap-4">
+                       <button onClick={() => {
+                          const R = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                          if (R) {
+                            const r = new R();
+                            r.lang = chatLang;
+                            r.onstart = () => setIsListening(true);
+                            r.onend = () => setIsListening(false);
+                            r.onresult = (e: any) => {
+                              const transcript = e.results[0][0].transcript;
+                              setOrderInput(transcript);
+                              processOrderInput(transcript);
+                            };
+                            r.start();
+                          }
+                       }} disabled={isParsingOrder} className={`p-8 rounded-[2rem] transition-all shadow-2xl active:scale-95 border flex flex-col items-center gap-2 min-w-[120px] ${isListening ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/50' : 'bg-white/5 text-white/40 border-white/10 hover:text-white/80'}`}>
+                         <span className="text-3xl">{isListening ? '⏹️' : '🎤'}</span>
+                         <span className="text-[9px] font-black uppercase">{isListening ? 'REC' : 'MIC'}</span>
+                       </button>
+                       <div className="flex-1 flex flex-col gap-4">
+                          <input value={orderInput} onChange={e => setOrderInput(e.target.value)} placeholder={chatLang === 'ta-IN' ? "எ.கா. 2 பிரியாணி மற்றும் ஒரு சிக்கன் 65..." : "e.g. I want 2 Biryanis and one Chicken 65"} className="w-full bg-black/60 border border-white/10 rounded-[2rem] px-10 py-8 text-xl text-white outline-none focus:border-indigo-500 transition-all shadow-inner placeholder:text-white/10" />
+                          <div className="grid grid-cols-2 gap-3">
+                            <button onClick={() => processOrderInput()} disabled={isParsingOrder || !orderInput} className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30">
+                              {isParsingOrder ? (chatLang === 'ta-IN' ? 'சரிபார்க்கிறது...' : 'Processing...') : (chatLang === 'ta-IN' ? 'பட்டியலில் சேர்' : 'Voice/Text Add')}
+                            </button>
+                            <button onClick={proceedToVerify} disabled={isParsingOrder || Object.keys(cart).length === 0} className="py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.5rem] font-black text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2">
+                              {chatLang === 'ta-IN' ? `ஆர்டரைச் சரிபார்க்கவும் (${cartTotalItems})` : `Finalize Order (${cartTotalItems})`}
+                            </button>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {orderStep === 'verifying' && parsedOrder && (
+                <div className="space-y-12 animate-in slide-in-from-bottom-8 duration-700">
+                  <div className="bg-indigo-600/5 border border-indigo-500/20 rounded-[3rem] p-12 space-y-8 shadow-[inset_0_0_40px_rgba(99,102,241,0.1)] relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500"></div>
+                    <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.5em] border-b border-indigo-500/20 pb-6">{chatLang === 'ta-IN' ? 'ஆர்டர் விவரங்கள்' : 'Final Order Verification'}</p>
+                    <div className="space-y-5">
+                      {parsedOrder.orderItems.map((item: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center group">
+                          <div className="flex items-center gap-4">
+                            <span className="w-8 h-8 bg-indigo-600/20 rounded-lg flex items-center justify-center text-[11px] font-black text-indigo-300">{item.quantity}x</span>
+                            <span className="text-[18px] font-black text-white uppercase group-hover:text-indigo-300 transition-colors">{item.name}</span>
+                          </div>
+                          <span className="text-[18px] font-bold text-slate-400 tracking-tighter">₹{item.price * item.quantity}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-8 border-t border-indigo-500/30 flex justify-between items-center">
+                      <span className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">{chatLang === 'ta-IN' ? 'மொத்த தொகை' : 'Aggregate Energy Credit'}</span>
+                      <span className="text-4xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">₹{parsedOrder.totalPrice}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-6">
+                    <button onClick={() => setOrderStep('menu')} className="flex-1 py-8 bg-white/5 text-white/40 hover:text-white text-[14px] font-black uppercase rounded-[2rem] border border-white/5 transition-all">{chatLang === 'ta-IN' ? 'மாற்றவும் / சேர்' : 'Edit / Add More'}</button>
+                    <button onClick={confirmFinalOrder} className="flex-[2] py-8 bg-emerald-600 text-white text-[16px] font-black uppercase rounded-[2.5rem] shadow-[0_20px_60px_rgba(16,185,129,0.4)] transition-all hover:scale-[1.03] active:scale-[0.96] flex items-center justify-center gap-4 group border border-emerald-400/20">
+                       <span className="text-4xl group-hover:scale-125 transition-transform">✓</span> {chatLang === 'ta-IN' ? 'ஆர்டர் செய்' : 'PLACE ORDER NOW'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {orderStep === 'placed' && (
+                <div className="py-24 flex flex-col items-center justify-center space-y-12 animate-in zoom-in-95 duration-700">
+                   <div className="w-40 h-40 bg-emerald-600 rounded-full flex items-center justify-center text-8xl text-white shadow-[0_0_100px_rgba(16,185,129,0.6)] animate-bounce border-8 border-emerald-400/40">✓</div>
+                   <div className="text-center space-y-4">
+                     <h3 className="text-5xl font-black text-white uppercase tracking-tighter">{chatLang === 'ta-IN' ? 'ஆர்டர் வெற்றிகரமாக முடிந்தது' : 'Order Transmitted'}</h3>
+                     <p className="text-[14px] text-emerald-400 font-black uppercase tracking-[0.4em]">{chatLang === 'ta-IN' ? 'இணைப்பு உறுதி செய்யப்பட்டது' : 'Node Connection Solidified'}</p>
+                   </div>
+                   <div className="p-8 bg-white/5 border border-white/10 rounded-[2rem] italic text-slate-300 text-lg max-w-[500px] text-center shadow-inner">
+                     {chatLang === 'ta-IN' ? '"மச்சி, சிக்னல் கிடைத்துவிட்டது! உணவு தயாராகி வருகிறது. இடத்திற்கு வந்து சேருங்கள்."' : '"Machi, signal is clear! Food is being prepped. Check your coordinates and move to the legend."'}
+                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {isRegistering && (
           <div className="absolute inset-0 z-[3000] bg-black/90 backdrop-blur-xl flex items-center justify-center p-8 animate-in fade-in duration-500 overflow-y-auto custom-scrollbar">
             <div className="max-w-4xl w-full bg-[#080808] border border-white/10 rounded-[3.5rem] p-12 space-y-10 shadow-[0_50px_150px_rgba(0,0,0,1)] border-t-white/20 max-h-[90vh] overflow-y-auto custom-scrollbar relative">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
-                    {isEditing ? 'Modify Node Data' : 'Establish Node Signal'}
-                  </h2>
-                  <p className="text-[11px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">
-                    {isEditing ? 'Updating live manifest' : 'Onboarding legend'}
-                  </p>
+                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter">{isEditing ? 'Modify Node Data' : 'Establish Node Signal'}</h2>
+                  <p className="text-[11px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">{isEditing ? 'Updating live manifest' : 'Onboarding legend'}</p>
                 </div>
                 <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/60 transition-all hover:rotate-90">✕</button>
               </div>
@@ -801,82 +1112,63 @@ export default function App() {
                 <div className="space-y-8">
                   <div className="grid grid-cols-4 gap-6">
                     <div className="col-span-1 space-y-2">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Symbol</label>
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Symbol</label>
                       <input value={regForm.emoji} onChange={e => setRegForm({...regForm, emoji: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-4 py-5 text-center text-2xl shadow-inner focus:border-indigo-500 transition-all outline-none text-white" />
                     </div>
                     <div className="col-span-3 space-y-2">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Hub Alias</label>
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Hub Alias</label>
                       <input placeholder="E.g. Murali's Snacks" value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[15px] outline-none focus:border-indigo-500 shadow-inner transition-all font-bold text-white placeholder:text-white/30" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Cuisine Specialty</label>
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Cuisine Specialty</label>
                     <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Manual Coordinates (DMS)</label>
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Manual Coordinates (DMS)</label>
                     <div className="flex gap-2">
-                      <input placeholder="13°05'41.5&quot;N 80°10'30.2&quot;E" value={regForm.manualDMS} onChange={e => setRegForm({...regForm, manualDMS: e.target.value})} className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[11px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/20" />
+                      <input placeholder={`13°05'41.5"N 80°10'30.2"E`} value={regForm.manualDMS} onChange={e => setRegForm({...regForm, manualDMS: e.target.value})} className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[11px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/20" />
                       <button onClick={handleApplyDMS} className="px-6 bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase rounded-2xl border border-white/10 transition-all">Apply</button>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Lens Video Source (YouTube URL)</label>
-                    <input placeholder="Paste YouTube link for shop tour..." value={regForm.youtubeLink} onChange={e => setRegForm({...regForm, youtubeLink: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
-                  </div>
-                  <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Broadcast Bio</label>
-                      <button onClick={generateBio} disabled={isGeneratingBio} className="text-[9px] font-black uppercase text-indigo-300 hover:text-indigo-200 transition-all flex items-center gap-2">
-                        {isGeneratingBio ? <span className="animate-pulse">Mining Bio...</span> : <>✨ Gemini Bio</>}
-                      </button>
+                      <label className="text-[9px] font-black uppercase text-indigo-400">Broadcast Bio</label>
+                      <button onClick={generateBio} disabled={isGeneratingBio} className="text-[9px] font-black uppercase text-indigo-300 hover:text-indigo-200 transition-all flex items-center gap-2">{isGeneratingBio ? '...' : '✨ Gemini Bio'}</button>
                     </div>
-                    <textarea rows={4} value={regForm.description} onChange={e => setRegForm({...regForm, description: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] resize-none shadow-inner focus:border-indigo-500 outline-none transition-all leading-relaxed text-white placeholder:text-white/30" placeholder="Narrate your legend..." />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Activation Hour</label>
-                      <input type="number" value={regForm.startHour} onChange={e => setRegForm({...regForm, startHour: parseInt(e.target.value)})} className="w-full bg-white/10 border border-white/10 rounded-xl px-5 py-4 text-[12px] shadow-inner focus:border-indigo-500 outline-none text-white" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Deactivation Hour</label>
-                      <input type="number" value={regForm.endHour} onChange={e => setRegForm({...regForm, endHour: parseInt(e.target.value)})} className="w-full bg-white/10 border border-white/10 rounded-xl px-5 py-4 text-[12px] shadow-inner focus:border-indigo-500 outline-none text-white" />
-                    </div>
+                    <textarea rows={4} value={regForm.description} onChange={e => setRegForm({...regForm, description: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] resize-none focus:border-indigo-500 outline-none transition-all leading-relaxed text-white placeholder:text-white/30" />
                   </div>
                 </div>
                 <div className="flex flex-col h-full space-y-8">
                   <div className="space-y-4 flex-1">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 tracking-widest px-1">Inventory Manifest (Menu)</label>
-                    <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 min-h-[250px] flex flex-col gap-3 shadow-inner custom-scrollbar overflow-y-auto max-h-[350px]">
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Inventory Manifest (Menu)</label>
+                    <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 min-h-[250px] flex flex-col gap-3 custom-scrollbar overflow-y-auto max-h-[350px]">
                       {regForm.menu.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white/10 p-4 rounded-2xl border border-white/5 animate-in slide-in-from-right-2 duration-300 group">
-                          <span className="text-[12px] font-black text-white uppercase tracking-tight">
-                            {item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span>
-                          </span>
-                          <button onClick={() => removeMenuItem(idx)} className="text-white/20 group-hover:text-rose-500 transition-colors p-1">✕</button>
+                        <div key={idx} className="flex justify-between items-center bg-white/10 p-4 rounded-2xl group">
+                          <span className="text-[12px] font-black text-white uppercase tracking-tight">{item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span></span>
+                          <button onClick={() => removeMenuItem(idx)} className="text-white/20 group-hover:text-rose-500 p-1">✕</button>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-4 bg-white/10 p-6 rounded-[2.5rem] border border-white/5 shadow-2xl">
+                  <div className="space-y-4 bg-white/10 p-6 rounded-[2.5rem] border border-white/5">
                     <div className="grid grid-cols-3 gap-3">
-                      <input placeholder="Item" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none focus:border-emerald-500/50" />
-                      <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none focus:border-emerald-500/50" />
+                      <input placeholder="Item" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none" />
+                      <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none" />
                     </div>
-                    <button onClick={addMenuItem} className="w-full py-4 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-black uppercase rounded-xl border border-emerald-500/20 transition-all active:scale-[0.98] shadow-lg shadow-emerald-600/10">+ Add to Manifest</button>
+                    <button onClick={addMenuItem} className="w-full py-4 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg shadow-emerald-600/10">+ Add to Manifest</button>
                   </div>
                 </div>
               </div>
               <div className="pt-10 flex gap-6 border-t border-white/5">
-                <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="flex-1 py-6 text-[12px] font-black uppercase text-white/40 hover:text-white/60 bg-white/10 rounded-2xl transition-all">Cancel Onboarding</button>
-                <button onClick={handleSaveHub} className="flex-1 py-6 text-[12px] font-black uppercase text-white bg-indigo-600 rounded-2xl shadow-2xl shadow-indigo-600/40 transition-all active:scale-[0.97] hover:bg-indigo-500">
-                  {isEditing ? 'UPDATE SPATIAL NODE' : 'ACTIVATE PARTNER NODE'}
-                </button>
+                <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="flex-1 py-6 text-[12px] font-black uppercase text-white/40 bg-white/10 rounded-2xl">Cancel</button>
+                <button onClick={handleSaveHub} className="flex-1 py-6 text-[12px] font-black uppercase text-white bg-indigo-600 rounded-2xl hover:bg-indigo-500">Activate Partner Node</button>
               </div>
             </div>
           </div>
         )}
-        {activeShop && (
+
+        {activeShop && !isOrdering && (
           <div className={`absolute bottom-10 left-10 right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700 transition-all`}>
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-10 rounded-[4rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col gap-10 max-h-[85vh] overflow-y-auto custom-scrollbar relative border-t-white/20">
               <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-10 right-10 w-14 h-14 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 transition-colors shadow-xl">✕</button>
@@ -893,97 +1185,58 @@ export default function App() {
                     <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
                   </div>
                   <div className="bg-white/5 border border-white/5 p-8 rounded-[2.5rem] italic relative overflow-hidden shadow-inner">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent"></div>
                     <p className="text-xl text-white leading-relaxed font-semibold">"{activeShop.description}"</p>
                   </div>
-                  <div className="pt-8 flex gap-8">
-                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-16 py-7 bg-white text-black text-[14px] font-black uppercase rounded-[2.25rem] shadow-2xl transition-all active:scale-[0.95] hover:shadow-white/40 flex items-center gap-4">
-                       🛰️ Initiate Navigation
-                    </a>
+                  <div className="pt-8 flex gap-4">
+                    <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-12 py-7 bg-white text-black text-[14px] font-black uppercase rounded-[2.25rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-4">🛰️ Navigate</a>
+                    {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
+                      <button onClick={initiateOrder} className="flex-1 py-7 bg-emerald-600 text-white text-[14px] font-black uppercase rounded-[2.25rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-4">🛒 Order Now</button>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           </div>
         )}
+
         <div className={`fixed bottom-10 right-10 z-[4000] transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isChatOpen ? 'w-[480px] h-[720px]' : 'w-24 h-24'}`}>
           {!isChatOpen ? (
-            <button onClick={() => setIsChatOpen(true)} className="w-full h-full bg-indigo-600 rounded-[3rem] flex items-center justify-center text-white text-4xl shadow-[0_25px_60px_rgba(79,70,229,0.5)] hover:scale-110 active:scale-90 transition-all hover:shadow-[0_30px_80px_rgba(79,70,229,0.8)] group relative overflow-hidden">
+            <button onClick={() => setIsChatOpen(true)} className="w-full h-full bg-indigo-600 rounded-[3rem] flex items-center justify-center text-white text-4xl shadow-[0_25px_60px_rgba(79,70,229,0.5)] transition-all group overflow-hidden">
                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-               <span className="group-hover:rotate-12 transition-transform relative z-10">💬</span>
+               <span className="relative z-10">💬</span>
             </button>
           ) : (
             <div className="w-full h-full bg-[#080808]/98 backdrop-blur-3xl border border-white/10 rounded-[4rem] flex flex-col overflow-hidden shadow-[0_60px_180px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-500 border-t-white/20">
               <div className="p-12 bg-white/5 border-b border-white/5 flex justify-between items-center">
                 <div className="flex flex-col">
-                  <h3 className="text-[14px] font-black text-white tracking-[0.6em] uppercase leading-none">GeoMind Voice</h3>
-                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-3 opacity-60">Spatial Reasoning Engine v2.5</p>
+                  <h3 className="text-[14px] font-black text-white tracking-[0.6em] uppercase">GeoMind Voice</h3>
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-3 opacity-60">Spatial Reasoning Engine</p>
                 </div>
-                <div className="flex items-center gap-5">
-                  <div className="bg-black/50 p-2 rounded-2xl flex border border-white/10 shadow-inner">
-                    <button onClick={() => setChatLang('en-US')} className={`px-5 py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>EN</button>
-                    <button onClick={() => setChatLang('ta-IN')} className={`px-5 py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>TA</button>
-                  </div>
-                  <button onClick={() => setIsChatOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/60 transition-all hover:scale-110">✕</button>
+                <div className="bg-black/50 p-2 rounded-2xl flex border border-white/10 shadow-inner">
+                  <button onClick={() => setChatLang('en-US')} className={`px-5 py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>EN</button>
+                  <button onClick={() => setChatLang('ta-IN')} className={`px-5 py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>TA</button>
                 </div>
+                <button onClick={() => setIsChatOpen(false)} className="w-12 h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/60 transition-all">✕</button>
               </div>
               <div className="flex-1 overflow-y-auto p-12 space-y-10 custom-scrollbar">
                 {chatHistory.map(m => (
                   <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
                     <div className={`max-w-[92%] p-8 rounded-[2.5rem] text-[15px] font-bold leading-relaxed shadow-2xl ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
-                      {m.isThinking ? (
-                        <div className="flex gap-2.5 py-1.5">
-                          <div className="w-3 h-3 bg-white/30 rounded-full animate-bounce"></div>
-                          <div className="w-3 h-3 bg-white/30 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                          <div className="w-3 h-3 bg-white/30 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <p>{m.text}</p>
-                          {m.sources && m.sources.length > 0 && (
-                            <div className="pt-4 border-t border-white/10 mt-4 flex flex-wrap gap-2">
-                              {m.sources.map((s, idx) => (
-                                <a key={idx} href={s.uri} target="_blank" className="text-[9px] font-black bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all max-w-[140px] truncate border border-white/10">
-                                  🔗 {s.title}
-                                </a>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {m.isThinking ? <p className="animate-pulse">Thinking...</p> : <p>{m.text}</p>}
                     </div>
                   </div>
                 ))}
                 <div ref={chatEndRef} />
               </div>
-              <div className="h-36 flex items-center justify-center p-4 border-t border-white/10 bg-white/2 text-center relative overflow-hidden">
-                <VoiceWave isActive={isVoiceActive || isListening} isSpeaking={isSpeaking} onStop={stopAudio} />
-                {isListening && <p className="absolute bottom-6 text-[11px] font-black uppercase text-rose-500 animate-pulse tracking-[0.5em]">Transmitting Spatial Feed...</p>}
-              </div>
               <form onSubmit={async (e) => {
                 e.preventDefault(); if (!chatInput.trim()) return;
                 const i = chatInput; setChatInput(''); 
                 setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
-                setIsVoiceActive(true);
                 const res = await spatialChatAgent(i, location);
                 setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
-                setIsVoiceActive(false);
               }} className="p-10 bg-black/60 border-t border-white/10 flex gap-5">
-                <button type="button" onClick={() => {
-                  const R = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-                  if (R) {
-                    const r = new R();
-                    r.lang = chatLang;
-                    r.onstart = () => setIsListening(true);
-                    r.onend = () => setIsListening(false);
-                    r.onresult = (e: any) => setChatInput(e.results[0][0].transcript);
-                    r.start();
-                  }
-                }} className={`p-6 rounded-3xl transition-all shadow-2xl active:scale-90 border ${isListening ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/40' : 'bg-white/10 text-white/40 border-white/10 hover:text-white/80'}`}>
-                  {isListening ? '🔴' : '🎤'}
-                </button>
-                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Inquire about spatial grid..." className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-8 py-6 text-[15px] text-white outline-none focus:border-indigo-500 transition-all placeholder:text-white/20 shadow-inner" />
-                <button type="submit" className="px-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black text-[14px] uppercase shadow-2xl shadow-indigo-600/40 active:scale-[0.95] transition-all">Send</button>
+                <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Inquire about spatial grid..." className="flex-1 bg-white/10 border border-white/10 rounded-3xl px-8 py-6 text-white outline-none focus:border-indigo-500" />
+                <button type="submit" className="px-14 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black text-[14px] uppercase">Send</button>
               </form>
             </div>
           )}

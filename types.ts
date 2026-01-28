@@ -43,7 +43,7 @@ export interface VendorProfile {
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
 }
@@ -80,4 +80,19 @@ export interface SpatialAnalytics {
   legendaryIndex: { name: string; score: number; reasoning: string }[];
   customerSegmentation: { segment: string; description: string; volume: number }[];
   sectorSummary: string;
+}
+
+export interface FlavorEra {
+  period: string;
+  profile: string;
+  description: string;
+  notableIngredients: string[];
+  popularItems: string[];
+  historicalContext: string;
+}
+
+export interface FlavorGenealogy {
+  neighborhood: string;
+  timeline: FlavorEra[];
+  summary: string;
 }
