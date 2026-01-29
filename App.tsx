@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
 import { 
@@ -11,7 +12,10 @@ import {
   spatialLensAnalysis, 
   generateSpatialAnalytics,
   getFlavorGenealogy,
-  parseOrderAgent
+  parseOrderAgent,
+  getPredictiveFootfall,
+  supervisorOrchestrator,
+  supervisorSelfHeal
 } from './services/geminiService';
 import { 
   Shop, 
@@ -155,7 +159,7 @@ export default function App() {
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
   const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'analytics'>('discovery');
-  const [discoverySubTab, setDiscoverySubTab] = useState<'intelligence' | 'nodes'>('intelligence');
+  const [discoverySubTab, setDiscoverySubTab] = useState<'nodes' | 'intelligence'>('nodes');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -174,6 +178,10 @@ export default function App() {
 
   const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
   const [isHistoryMining, setIsHistoryMining] = useState(false);
+
+  // --- Footfall States ---
+  const [footfall, setFootfall] = useState<{ crowdingLevel: string, waitTime: number, reasoning: string } | null>(null);
+  const [isPredictingFootfall, setIsPredictingFootfall] = useState(false);
 
   // --- Ordering Flow States ---
   const [isOrdering, setIsOrdering] = useState(false);
@@ -208,6 +216,12 @@ export default function App() {
   });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
 
+  // Derived state moved to top of component
+  const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
+  const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
+  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
+  const cartTotalItems = Object.values(cart).reduce((a, b) => a + b, 0);
+
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
     setShops(prev => {
@@ -224,7 +238,7 @@ export default function App() {
           status: prevLiveInstance ? VendorStatus.ONLINE : VendorStatus.OFFLINE,
           emoji: p.emoji,
           cuisine: p.cuisine,
-          description: p.description,
+          description: prevLiveInstance ? prevLiveInstance.description : p.description,
           menu: p.menu,
           hours: p.hours,
           youtubeLink: p.youtubeLink
@@ -273,13 +287,13 @@ export default function App() {
     } catch (err) { setIsSpeaking(false); setIsVoiceActive(false); }
   };
 
-  const handleToggleSignal = async () => {
+  const handleToggleSignal = () => {
     const profile = myProfiles.find(p => p.id === activeProfileId);
     if (!profile) return;
     const liveId = `live-${profile.id}`;
     const isNowOnline = !shops.some(s => s.id === liveId && s.status === VendorStatus.ONLINE);
+    
     if (isNowOnline) {
-      const alert = await spatialAlertAgent(profile.name, location);
       const liveShop: Shop = { 
         id: liveId, 
         name: profile.name, 
@@ -288,13 +302,18 @@ export default function App() {
         status: VendorStatus.ONLINE, 
         emoji: profile.emoji, 
         cuisine: profile.cuisine, 
-        description: alert.tamilSummary, 
+        description: profile.description, 
         hours: profile.hours, 
         menu: profile.menu,
         youtubeLink: profile.youtubeLink
       };
       setShops(prev => [liveShop, ...prev.filter(s => s.id !== liveShop.id && s.id !== profile.id)]);
-      addLog('Spatial', `Signal activated for ${profile.name}. Vendor is now live on grid.`, 'resolved');
+      addLog('Spatial', `Signal activated for ${profile.name}. Vendor is now live.`, 'resolved');
+      
+      spatialAlertAgent(profile.name, location).then(alert => {
+        setShops(prev => prev.map(s => s.id === liveId ? { ...s, description: alert.tamilSummary } : s));
+        addLog('Linguistic', `Localized broadcast summary refined for ${profile.name}.`, 'resolved');
+      });
     } else {
       setShops(prev => prev.filter(s => s.id !== liveId));
       addLog('Spatial', `Signal deactivated for ${profile.name}. Node is now offline.`, 'failed');
@@ -305,8 +324,24 @@ export default function App() {
     setActiveShop(shop);
     setLocation(shop.coords);
     setIsVoiceActive(true);
-    getTamilAudioSummary(shop).then(data => data ? playVoice(data) : setIsVoiceActive(false));
-    getTamilTextSummary(shop).then(summary => addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved'));
+    setFootfall(null);
+    
+    // RESTORE INTEL LINGUISTIC: Trigger summary and log it in the sidebar intel as before
+    getTamilTextSummary(shop).then(summary => addLog('Linguistic', `Spatial Insight for ${shop.name}: ${summary.tamil}\n\n${summary.english}`, 'resolved'));
+
+    if (shop.id.startsWith('sync') && (!shop.description || shop.description.length < 50)) {
+      getTamilAudioSummary(shop).then(data => data ? playVoice(data) : setIsVoiceActive(false));
+    } else {
+      getTamilAudioSummary(shop).then(data => data ? playVoice(data) : setIsVoiceActive(false));
+    }
+    
+    // Predictive Footfall logic (Temporal Reasoning)
+    setIsPredictingFootfall(true);
+    getPredictiveFootfall(shop, location).then(pred => {
+      setFootfall(pred);
+      addLog('Spatial', `Predictive Insight for ${shop.name}: ${pred.reasoning}`, 'resolved');
+    }).finally(() => setIsPredictingFootfall(false));
+    
     startLensAnalysisInternal(shop);
   };
 
@@ -338,8 +373,10 @@ export default function App() {
       const result = await getFlavorGenealogy(location);
       setFlavorHistory(result);
       addLog('Historian', `Cross-temporal synthesis complete for ${result.neighborhood}.`, 'resolved');
+      return result;
     } catch (err) {
       addLog('Historian', 'Anomaly detected in historical records. Registry inaccessible.', 'failed');
+      throw err;
     } finally {
       setIsHistoryMining(false);
     }
@@ -350,7 +387,7 @@ export default function App() {
     const discoveredOnly = targetShops.filter(s => s.id.startsWith('sync'));
     if (discoveredOnly.length === 0) {
       addLog('Analytics', 'Insufficient spatial nodes for analytics. Discovery required.', 'failed');
-      return;
+      return null;
     }
     setIsAnalyzing(true);
     addLog('Analytics', 'Processing food grid metrics and customer segmentation...', 'processing');
@@ -358,8 +395,10 @@ export default function App() {
       const res = await generateSpatialAnalytics(discoveredOnly);
       setAnalytics(res);
       addLog('Analytics', 'Spatial intelligence dashboard synchronized.', 'resolved');
+      return res;
     } catch (err) {
       addLog('Analytics', 'Telemetry parsing failed. Visual subsystem offline.', 'failed');
+      throw err;
     } finally {
       setIsAnalyzing(false);
     }
@@ -418,6 +457,24 @@ export default function App() {
     setIsRegistering(true);
   };
 
+  const generateBio = async () => {
+    if (!regForm.name || !regForm.cuisine) {
+      alert("Name and Cuisine are required to generate a bio signal.");
+      return;
+    }
+    setIsGeneratingBio(true);
+    addLog('Linguistic', `Generating marketing manifest for ${regForm.name}...`, 'processing');
+    try {
+      const bio = await generateVendorBio(regForm.name, regForm.cuisine);
+      setRegForm(prev => ({ ...prev, description: bio }));
+      addLog('Linguistic', `Bio signal synthesized.`, 'resolved');
+    } catch (err) {
+      addLog('Linguistic', 'Bio generation failed. Atmospheric noise.', 'failed');
+    } finally {
+      setIsGeneratingBio(false);
+    }
+  };
+
   const handleSaveHub = () => {
     if (!regForm.name || !regForm.cuisine) {
       alert("Name and Cuisine are required to establish a node.");
@@ -438,6 +495,7 @@ export default function App() {
       addLog('Spatial', `Node "${regForm.name}" updated in central registry.`, 'resolved');
     } else {
       const newId = Date.now().toString();
+      // Fix undefined variable regHour by using regForm.endHour
       const newProfile: VendorProfile = {
         id: newId,
         name: regForm.name,
@@ -480,39 +538,37 @@ export default function App() {
     setRegForm(prev => ({ ...prev, menu: prev.menu.filter((_, i) => i !== index) }));
   };
 
-  const generateBio = async () => {
-    if (!regForm.name || !regForm.cuisine) return;
-    setIsGeneratingBio(true);
-    const bio = await generateVendorBio(regForm.name, regForm.cuisine);
-    setRegForm(prev => ({ ...prev, description: bio }));
-    setIsGeneratingBio(false);
-  };
-
   const startDiscovery = async () => {
     setIsMining(true);
     setExplorerTab('discovery');
-    setDiscoverySubTab('intelligence');
+    setDiscoverySubTab('nodes');
     addLog('Discovery', 'Initiating wide-band 25-point spatial scrape...', 'processing');
     try {
       const result = await discoveryAgent("Legendary street food and hidden gems", location);
       const updatedShops = [...shops.filter(s => !s.id.startsWith('sync-')), ...result.shops];
       setShops(updatedShops);
       setLastSources(result.sources);
-      let logIndex = 0;
-      const interval = setInterval(() => {
-        if (logIndex < result.logs.length) {
-          addLog('Discovery', result.logs[logIndex], 'resolved');
-          logIndex++;
-        } else {
-          clearInterval(interval);
-          addLog('Discovery', `Discovery Complete: Identified 25 legends in this sector.`, 'resolved');
-          setIsMining(false);
-          computeAnalytics(updatedShops);
-        }
-      }, 400);
+      
+      // Success check: If we found shops, log them. If not, it's a failure we return to the orchestrator.
+      if (result.shops.length > 0) {
+        let logIndex = 0;
+        const interval = setInterval(() => {
+          if (logIndex < result.logs.length) {
+            addLog('Discovery', result.logs[logIndex], 'resolved');
+            logIndex++;
+          } else {
+            clearInterval(interval);
+            addLog('Discovery', `Discovery Complete: Identified ${result.shops.length} nodes.`, 'resolved');
+            setIsMining(false);
+            computeAnalytics(updatedShops);
+          }
+        }, 400);
+      }
+      return result.shops;
     } catch (err) {
       addLog('Discovery', 'Discovery node timeout. Atmospheric interference suspected.', 'failed');
       setIsMining(false);
+      throw err;
     }
   };
 
@@ -548,6 +604,8 @@ export default function App() {
     addLog('Linguistic', `Processing signal: "${textToParse}"`, 'processing');
     try {
       const res = await parseOrderAgent(textToParse, activeShop.menu);
+      
+      // Update cart with matched items
       setCart(prev => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
@@ -555,7 +613,18 @@ export default function App() {
         });
         return next;
       });
-      addLog('Linguistic', `Manifest updated from voice grid. Added ${res.orderItems.length} entities.`, 'resolved');
+
+      // Report unmatched items to the user
+      if (res.unmatchedItems && res.unmatchedItems.length > 0) {
+        res.unmatchedItems.forEach((item: any) => {
+          const feedback = item.suggestion 
+            ? (chatLang === 'ta-IN' ? `"${item.inputName}" பட்டியிலில்லை. "${item.suggestion}" வேண்டுமா?` : `"${item.inputName}" not in menu. Did you mean "${item.suggestion}"?`)
+            : (chatLang === 'ta-IN' ? `"${item.inputName}" பட்டியிலில்லை.` : `"${item.inputName}" not found in menu.`);
+          addLog('Linguistic', feedback, 'failed');
+        });
+      } else {
+        addLog('Linguistic', `Manifest updated from voice grid. Added ${res.orderItems.length} entities.`, 'resolved');
+      }
       setOrderInput(''); 
     } catch (e) {
       addLog('Linguistic', `Signal decoding failed. Re-state requirements.`, 'failed');
@@ -590,14 +659,96 @@ export default function App() {
     }, 4000);
   };
 
-  // --- Chat Logic ---
+  // --- Chat Orchestrator Flow with SELF-HEALING ---
   const handleChatSubmit = async (text: string) => {
     if (!text.trim()) return;
-    const i = text;
+    const userInput = text;
     setChatInput(''); 
-    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
-    const res = await chatAgent(i, location);
-    setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
+    
+    // Initial thinking state
+    const messageId = Date.now().toString();
+    setChatHistory(prev => [...prev, { id: messageId, role: 'user', text: userInput }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
+    
+    addLog('Supervisor', `Analyzing intent for task orchestration...`, 'processing');
+    
+    try {
+      // Step 1: Initial Plan
+      let plan = await supervisorOrchestrator(userInput, location, discoveredShops.length);
+      addLog('Supervisor', plan.thoughtProcess, 'resolved');
+      addLog('Linguistic', plan.response, 'resolved');
+
+      setChatHistory(prev => prev.map(m => m.isThinking ? { 
+        ...m, 
+        text: plan.response, 
+        isThinking: false, 
+        triggeredAgents: plan.actions,
+        thoughtProcess: plan.thoughtProcess 
+      } : m));
+
+      // Step 2: Execute Agents and Check for Failures (Self-Healing)
+      let finalResultsReport = "";
+      
+      const executePlan = async (actions: string[]) => {
+        let success = true;
+        for (const action of actions) {
+          if (action === 'DISCOVERY') {
+            addLog('Supervisor', 'Executing Discovery Sub-Agent...', 'processing');
+            const found = await startDiscovery();
+            if (found.length === 0) {
+              success = false;
+              finalResultsReport += "DISCOVERY returned 0 shops in this sector. ";
+            }
+          } else if (action === 'ANALYTICS') {
+            addLog('Supervisor', 'Executing Analytics Sub-Agent...', 'processing');
+            const res = await computeAnalytics();
+            if (!res) {
+              success = false;
+              finalResultsReport += "ANALYTICS failed due to insufficient node data. ";
+            }
+          } else if (action === 'HISTORY') {
+            addLog('Supervisor', 'Executing Historian Sub-Agent...', 'processing');
+            try {
+              await fetchFlavorHistory();
+            } catch (e) {
+              success = false;
+              finalResultsReport += "HISTORY agent encountered a registry error. ";
+            }
+          }
+        }
+        return success;
+      };
+
+      const isSuccess = await executePlan(plan.actions);
+
+      // Step 3: SELF-HEAL if needed
+      if (!isSuccess) {
+        addLog('Supervisor', `Self-Healing triggered: ${finalResultsReport}`, 'processing');
+        const healPlan = await supervisorSelfHeal(userInput, finalResultsReport, location);
+        
+        addLog('Supervisor', `Diagnosis: ${healPlan.diagnosis}`, 'resolved');
+        addLog('Linguistic', healPlan.newResponse, 'resolved');
+
+        // Update UI message to show the self-healing attempt
+        setChatHistory(prev => [...prev, { 
+          id: Date.now().toString(), 
+          role: 'model', 
+          text: healPlan.newResponse,
+          triggeredAgents: healPlan.retryActions,
+          thoughtProcess: `Self-Heal Diagnosis: ${healPlan.diagnosis}`
+        }]);
+
+        // Re-execute retry actions
+        if (healPlan.retryActions && healPlan.retryActions.length > 0) {
+           await executePlan(healPlan.retryActions);
+        }
+      }
+
+    } catch (err) {
+      console.error("Supervisor Failure:", err);
+      const res = await chatAgent(userInput, location);
+      addLog('Linguistic', res.text, 'resolved');
+      setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
+    }
   };
 
   const handleChatVoice = () => {
@@ -617,11 +768,6 @@ export default function App() {
     r.start();
   };
 
-  const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
-  const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
-  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  const cartTotalItems = Object.values(cart).reduce((a, b) => a + b, 0);
-
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden selection:bg-indigo-500/30">
       <style>{`
@@ -631,11 +777,13 @@ export default function App() {
         @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
         @keyframes neon-pulse { 0% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2), 0 0 10px rgba(99, 102, 241, 0.1); } 50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.2); } 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2), 0 0 10px rgba(99, 102, 241, 0.1); } }
         @keyframes lineFlow { 0% { height: 0; } 100% { height: 100%; } }
+        @keyframes scan { 0% { top: -10%; opacity: 0; } 50% { opacity: 1; } 100% { top: 110%; opacity: 0; } }
         .animate-siri-liquid { animation: siri-liquid 8s linear infinite; }
         .animate-siri-liquid-alt { animation: siri-liquid-alt 12s ease-in-out infinite; }
         .animate-siri-liquid-fast { animation: siri-liquid-fast 4s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
         .animate-grow { animation: grow 0.8s ease-out forwards; transform-origin: bottom; }
         .animate-neon-pulse:hover { animation: neon-pulse 1.5s infinite; }
+        .animate-scan { animation: scan 2s linear infinite; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -793,7 +941,7 @@ export default function App() {
                               </p>
                               <div className="flex flex-wrap gap-2.5">
                                 {era.popularItems.map((item, j) => (
-                                  <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-emerald-400 text-black font-black uppercase shadow-lg transform hover:scale-105 transition-transform cursor-default">
+                                  <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase shadow-lg transform hover:scale-105 transition-transform cursor-default">
                                     {item}
                                   </span>
                                 ))}
@@ -830,7 +978,7 @@ export default function App() {
                   <div className="space-y-4">
                     {logs.map(l => (
                       <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300 shadow-sm">
-                        <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : l.agent === 'Discovery' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Lens' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
+                        <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : l.agent === 'Discovery' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Lens' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : l.agent === 'Supervisor' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
                         <p className="text-[10px] font-bold text-slate-400 leading-relaxed mt-2 whitespace-pre-line tracking-tight">{l.message}</p>
                       </div>
                     ))}
@@ -841,10 +989,10 @@ export default function App() {
                       <div className="py-20 flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-500">
                         <div className="relative w-32 h-32 flex items-center justify-center">
                           <div className="absolute inset-0 bg-indigo-500/10 rounded-full animate-ping"></div>
-                          <div className="absolute inset-4 bg-indigo-500/20 rounded-full animate-pulse"></div>
-                          <div className="absolute inset-0 border-2 border-dashed border-indigo-500/30 rounded-full animate-[spin_10s_linear_infinite]"></div>
-                          <div className="absolute inset-8 border-2 border-dashed border-cyan-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
-                          <div className="relative text-5xl">📡</div>
+                          <div className="absolute inset-2 border border-indigo-500/20 rounded-full animate-pulse"></div>
+                          <div className="absolute inset-[-10px] border border-indigo-500/5 rounded-full animate-[spin_8s_linear_infinite]"></div>
+                          <div className="absolute inset-x-4 top-0 h-0.5 bg-indigo-400/50 blur-sm animate-scan z-20"></div>
+                          <div className="relative text-6xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">🛰️</div>
                         </div>
                         <div className="text-center space-y-2">
                           <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse leading-loose">
@@ -857,18 +1005,24 @@ export default function App() {
                       </div>
                     ) : (
                       <>
-                        <div className="flex gap-1 bg-white/5 p-1 rounded-xl shrink-0">
-                          <button 
-                            onClick={() => setDiscoverySubTab('intelligence')} 
-                            className={`flex-1 py-2.5 text-[8px] font-black uppercase rounded-lg transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-white/20 hover:text-white/40'}`}
-                          >
-                            Spatial Intelligence
-                          </button>
+                        <div className="flex bg-[#0a0a0a] p-1.5 rounded-2xl border border-white/5 shadow-inner backdrop-blur-md">
                           <button 
                             onClick={() => setDiscoverySubTab('nodes')} 
-                            className={`flex-1 py-2.5 text-[8px] font-black uppercase rounded-lg transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-white/20 hover:text-white/40'}`}
+                            className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all duration-500 relative overflow-hidden ${discoverySubTab === 'nodes' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
                           >
-                            Identified Nodes
+                            {discoverySubTab === 'nodes' && (
+                              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 to-indigo-700 shadow-[0_0_20px_rgba(79,70,229,0.3)] animate-in fade-in zoom-in-95 duration-500"></div>
+                            )}
+                            <span className="relative z-10 tracking-[0.1em]">Identified Nodes</span>
+                          </button>
+                          <button 
+                            onClick={() => setDiscoverySubTab('intelligence')} 
+                            className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all duration-500 relative overflow-hidden ${discoverySubTab === 'intelligence' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
+                          >
+                            {discoverySubTab === 'intelligence' && (
+                              <div className="absolute inset-0 bg-gradient-to-tr from-indigo-600 to-indigo-700 shadow-[0_0_20px_rgba(79,70,229,0.3)] animate-in fade-in zoom-in-95 duration-500"></div>
+                            )}
+                            <span className="relative z-10 tracking-[0.1em]">Spatial Intelligence</span>
                           </button>
                         </div>
 
@@ -964,8 +1118,8 @@ export default function App() {
                             </div>
                           )
                         ) : (
-                          <div className="space-y-4 pt-6 animate-in fade-in duration-500">
-                            <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg">Identified Nodes ({discoveredShops.length})</p>
+                          <div className="space-y-4 pt-4 animate-in fade-in duration-500">
+                            <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-lg mb-2">Identified Nodes ({discoveredShops.length})</p>
                             <div className="space-y-4 pb-20">
                               {discoveredShops.length > 0 ? (
                                 discoveredShops.map((s, i) => (
@@ -1076,7 +1230,7 @@ export default function App() {
       <div className="flex-1 relative bg-[#020202]">
         <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
         
-        {/* Ordering Overlay - Enhanced Cart & Language Interaction */}
+        {/* Ordering Overlay */}
         {isOrdering && activeShop && (
           <div className="absolute inset-0 z-[6000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-8 animate-in fade-in duration-700">
             <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[4rem] p-16 space-y-12 shadow-[0_50px_150px_rgba(0,0,0,1)] relative border-t-white/20">
@@ -1111,7 +1265,6 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* Cart Summary */}
                   {cartTotalItems > 0 && (
                     <div className="bg-emerald-600/10 border border-emerald-500/20 p-6 rounded-[2rem] flex justify-between items-center animate-in slide-in-from-bottom-2">
                        <div className="flex gap-2 items-center">
@@ -1291,20 +1444,41 @@ export default function App() {
                 <div className="text-6xl md:text-7xl bg-white/5 p-6 rounded-[2.5rem] border border-white/5 h-fit shadow-2xl group transition-all duration-700 mx-auto md:mx-0 shrink-0">
                    <div className="group-hover:scale-110 transition-transform cursor-default">{activeShop.emoji}</div>
                 </div>
-                <div className="flex-1 space-y-3 md:space-y-4 min-w-0">
+                <div className="flex-1 space-y-1.5 md:space-y-2 min-w-0">
                   <div className="flex justify-between items-start gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight leading-tight truncate">{activeShop.name}</h3>
-                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mt-1">{activeShop.cuisine}</p>
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{activeShop.cuisine}</p>
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-4">
+                      {(isPredictingFootfall || footfall) && (
+                        <div className="bg-indigo-600/10 border border-indigo-500/20 px-4 py-2 rounded-2xl flex items-center gap-3 animate-in fade-in duration-700">
+                          <div className={`w-2 h-2 rounded-full ${isPredictingFootfall ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'}`}></div>
+                          <div className="flex flex-col">
+                            <span className="text-[8px] font-black uppercase text-indigo-400/60 tracking-widest leading-none mb-1">Live Prediction</span>
+                            <span className="text-[10px] font-black text-white uppercase tracking-tight leading-none">
+                              {isPredictingFootfall ? 'Reasoning...' : `${footfall?.waitTime}m Wait // ${footfall?.crowdingLevel}`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
                     </div>
                   </div>
-                  <div className="bg-white/5 border border-white/5 p-4 md:p-5 rounded-[1.25rem] italic relative overflow-hidden shadow-inner max-h-[100px] overflow-y-auto custom-scrollbar">
-                    <p className="text-sm md:text-base text-white leading-relaxed font-semibold line-clamp-2">"{activeShop.description}"</p>
+                  
+                  <div className="bg-white/5 border border-white/5 p-2.5 md:p-3 rounded-[1rem] italic relative overflow-hidden shadow-inner max-h-[120px] overflow-y-auto custom-scrollbar">
+                    <p className="text-[11px] md:text-xs text-white/70 leading-relaxed font-medium mb-2">"{activeShop.description}"</p>
+                    {footfall && (
+                      <div className="mt-2 pt-2 border-t border-white/5">
+                        <p className="text-[10px] md:text-[11px] text-indigo-300 font-bold leading-relaxed flex gap-2">
+                          <span className="shrink-0">💡</span>
+                          <span>{footfall.reasoning}</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                     <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[11px] font-black uppercase rounded-[1.25rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-3 active:scale-95">🛰️ Navigate</a>
                     {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
                       <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[11px] font-black uppercase rounded-[1.25rem] shadow-2xl transition-all hover:bg-emerald-500 flex items-center justify-center gap-3 active:scale-95 border border-emerald-400/20">🛒 Order Now</button>
@@ -1339,7 +1513,18 @@ export default function App() {
                 {chatHistory.map(m => (
                   <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
                     <div className={`max-w-[92%] p-8 rounded-[2.5rem] text-[15px] font-bold leading-relaxed shadow-2xl ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
-                      {m.isThinking ? <p className="animate-pulse">Thinking...</p> : <p>{m.text}</p>}
+                      {m.isThinking ? <p className="animate-pulse flex items-center gap-2"><span>Thinking...</span> <span className="text-[10px] text-indigo-400">Supervisor Logic Active</span></p> : (
+                        <div className="space-y-4">
+                          <p>{m.text}</p>
+                          {m.triggeredAgents && m.triggeredAgents.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                              {m.triggeredAgents.map(a => (
+                                <span key={a} className="text-[8px] font-black uppercase px-2 py-1 bg-white/5 rounded-lg text-indigo-300 border border-white/5">Agent: {a} Initiated</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

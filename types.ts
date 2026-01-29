@@ -1,4 +1,3 @@
-
 export interface LatLng {
   lat: number;
   lng: number;
@@ -43,7 +42,7 @@ export interface VendorProfile {
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Supervisor';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
 }
@@ -54,6 +53,8 @@ export interface ChatMessage {
   text: string;
   isThinking?: boolean;
   sources?: GroundingSource[];
+  triggeredAgents?: string[];
+  thoughtProcess?: string;
 }
 
 export interface GroundingSource {
