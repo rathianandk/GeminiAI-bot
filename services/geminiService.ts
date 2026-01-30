@@ -3,93 +3,6 @@ import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGe
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-/**
- * SUPERVISOR ORCHESTRATOR
- * Acts as the brain of the app, deciding which specialized sub-agents to trigger.
- */
-export const supervisorOrchestrator = async (message: string, location: LatLng, shopCount: number) => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
-    contents: `MISSION: Act as the GeoMind SUPERVISOR ORCHESTRATOR. 
-    Analyze the user's intent and decide which sub-agents are required to fulfill the request.
-    
-    USER QUERY: "${message}"
-    CURRENT GRID STATE: ${shopCount} shops identified in the local sector.
-    LOCATION: (${location.lat}, ${location.lng})
-    
-    SUB-AGENTS AVAILABLE:
-    - DISCOVERY: Scans Google Maps/Search for 25 legends. Trigger if user wants to find places or if grid is empty.
-    - ANALYTICS: Generates spatial intelligence cards, cuisine trends, and demographics. Trigger if user asks about area summary, trends, or stats.
-    - HISTORY: Deep temporal flavor genealogy (1M token reasoning). Trigger if user asks about migration, historical context, or "old" flavors.
-    
-    INSTRUCTIONS:
-    - If the query is complex, trigger multiple agents.
-    - Always provide a synthesize 'response' text that addresses the user immediately.
-    
-    RETURN RAW JSON matching the responseSchema.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          response: { type: Type.STRING, description: "Direct answer to user." },
-          actions: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "Agents to trigger: DISCOVERY, ANALYTICS, HISTORY"
-          },
-          thoughtProcess: { type: Type.STRING, description: "Causal reasoning for orchestration plan." }
-        },
-        required: ["response", "actions", "thoughtProcess"]
-      }
-    }
-  });
-
-  return JSON.parse(response.text || "{\"response\": \"\", \"actions\": [], \"thoughtProcess\": \"\"}");
-};
-
-/**
- * SUPERVISOR SELF-HEAL
- * Triggered when a sub-agent returns insufficient or failed data. 
- * Decides whether to retry with different parameters or pivot the strategy.
- */
-export const supervisorSelfHeal = async (originalQuery: string, failureReport: string, location: LatLng) => {
-  const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
-    contents: `MISSION: SELF-HEALING SPATIAL REASONING.
-    The previous orchestration plan failed to yield sufficient results.
-    
-    ORIGINAL GOAL: "${originalQuery}"
-    FAILURE STATUS: "${failureReport}"
-    CURRENT COORDINATES: (${location.lat}, ${location.lng})
-    
-    RE-PLANNING TASKS:
-    1. Diagnose why results were zero or low quality.
-    2. Propose a corrective action (e.g., broadening search keywords, shifting discovery radius, or pivoting to historical data if live data is sparse).
-    3. Update the user on the roadblock and the new strategy.
-    
-    RETURN RAW JSON matching the responseSchema.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          newResponse: { type: Type.STRING, description: "Update to the user about the self-healing attempt." },
-          retryActions: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING },
-            description: "Corrected agents to trigger: DISCOVERY, ANALYTICS, HISTORY"
-          },
-          diagnosis: { type: Type.STRING, description: "Reason why the first attempt failed." }
-        },
-        required: ["newResponse", "retryActions", "diagnosis"]
-      }
-    }
-  });
-
-  return JSON.parse(response.text || "{\"newResponse\": \"\", \"retryActions\": [], \"diagnosis\": \"\"}");
-};
-
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -243,65 +156,6 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
   return JSON.parse(response.text || "{}");
 };
 
-export const getPredictiveFootfall = async (shop: Shop, location: LatLng) => {
-  const now = new Date();
-  const day = now.toLocaleDateString('en-US', { weekday: 'long' });
-  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `Reason over predictive footfall and wait times for "${shop.name}" (${shop.cuisine}) at coordinates (${shop.coords.lat}, ${shop.coords.lng}).
-    
-    CURRENT CONTEXT:
-    - Time: ${time}
-    - Day: ${day}
-    - Location Sector: Near (${location.lat}, ${location.lng})
-    
-    INSTRUCTIONS:
-    1. Search for real-time weather and traffic data in this area using available tools.
-    2. Analyze the 'Cause and Effect' of these factors on this specific shop. (e.g., if it's raining, hot bajjis/tea will have higher demand).
-    3. Predict the crowding level and wait time.
-    
-    OUTPUT FORMAT: You MUST return a single JSON object.
-    {
-      "crowdingLevel": "Low" | "Medium" | "High" | "Extreme",
-      "waitTime": number (in minutes),
-      "reasoning": "A 1-sentence explanation including temporal and environmental context."
-    }
-    
-    Example Reasoning: "It's Friday at 7 PM and it's raining in Mylapore; expect the Bajjis at Jannal Kadai to have a 20-minute wait due to high demand for hot snacks in this weather."
-    
-    CRITICAL: Return ONLY the raw JSON. No markdown blocks. No extra text.`,
-    config: {
-      tools: [{ googleMaps: {} }, { googleSearch: {} }],
-      toolConfig: {
-        retrievalConfig: {
-          latLng: {
-            latitude: location.lat,
-            longitude: location.lng
-          }
-        }
-      }
-    }
-  });
-
-  const text = (response.text || "").trim();
-  try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    return JSON.parse(text);
-  } catch (e) {
-    console.error("Failed to parse predictive footfall JSON:", e);
-    return { 
-      crowdingLevel: "Unknown", 
-      waitTime: 0, 
-      reasoning: "Spatial reasoning signal interrupted. Using baseline estimates." 
-    };
-  }
-};
-
 export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGenealogy> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -354,17 +208,18 @@ export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGeneal
 export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `EXTRACT ORDER ITEMS FROM USER INPUT AND IDENTIFY MISSING ITEMS.
+    contents: `EXTRACT ORDER ITEMS FROM USER INPUT.
     
     USER INPUT: "${userInput}"
     SHOP MENU: ${JSON.stringify(menu)}
     
     INSTRUCTIONS:
-    1. Identify items mentioned in the input that ARE in the menu.
-    2. Identify items mentioned in the input that are NOT in the menu (unmatched).
-    3. For each unmatched item, find the 'closest' similar item available in the menu provided.
-    4. Handle Tamil (onnu, rendu, etc.) and English.
-    5. Return exactly the matched items and any missing item reports.
+    1. Identify ONLY the items mentioned in the LATEST USER INPUT provided above. Do NOT include items from previous context.
+    2. Support English and Tamil.
+    3. Tamil quantity mappings: "onnu/onru" = 1, "rendu" = 2, "moonu" = 3, "naalu" = 4, "anju" = 5, "aaru" = 6, "ezhu" = 7, "ettu" = 8, "onbadhu" = 9, "pathu" = 10.
+    4. Map Tamil pronunciations to English menu names (e.g. "biryani" -> "Mutton Biryani" if that's the closest match).
+    5. If an item name is vague, pick the best match from the menu.
+    6. Return a list of items and their individual counts.
     
     RETURN RAW JSON matching the responseSchema.`,
     config: {
@@ -384,43 +239,35 @@ export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
               required: ["name", "quantity", "price"]
             }
           },
-          unmatchedItems: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                inputName: { type: Type.STRING },
-                suggestion: { type: Type.STRING, nullable: true }
-              },
-              required: ["inputName"]
-            }
-          },
           totalPrice: { type: Type.NUMBER }
         },
-        required: ["orderItems", "unmatchedItems", "totalPrice"]
+        required: ["orderItems", "totalPrice"]
       }
     }
   });
-  return JSON.parse(response.text || "{\"orderItems\":[], \"unmatchedItems\":[], \"totalPrice\":0}");
+  return JSON.parse(response.text || "{\"orderItems\":[], \"totalPrice\":0}");
 };
 
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
-    contents: `Perform an intensive 'Lens Mode' spatial intelligence scrape for the urban sector around "${shopName}" at (${location.lat}, ${location.lng}). 
-    Analyze simulated visual metadata for this specific street segment.
+    contents: `MISSION: 'Lens Mode' Intensive Spatial Intelligence Scrape for "${shopName}" at (${location.lat}, ${location.lng}).
+    DATA SOURCE: @RollingSirrr Visual Database.
     
-    Each item must include:
-    - type: one of 'bottleneck', 'flow', 'friction', 'opportunity'
-    - detail: A specific observation
-    - causalBottleneck: A deep causal analysis.
+    Identify key frames from the video that demonstrate the spatial intelligence and urban integration of the street food stall. Specifically, focus on images that show:
+    1. The natural landscape integration, such as the use of mature trees for shade (the 'green roof' effect).
+    2. The sidewalk layout, showing how the stall utilizes public pathways for dining without blocking pedestrian flow.
+    3. The boundary management, including how parked vehicles (scooters) or physical structures define the eating area from the active road.
+    
+    Look for frames that illustrate the compact efficiency of the cart, the proxemics of the customers, and the environmental cooling provided by trees.
     
     Return a JSON object with:
-    - "observations": An array of EXACTLY 25 LensObservation objects.
+    - "observations": Array of 10-15 detailed LensObservation objects.
+    - "extractedFrames": Array of 5-8 LensFrame objects (descriptions of the visual data).
     - "recommendation": A synthesized urban planning strategy.
-    - "videoSource": A plausible YouTube URL relating to this area.
+    - "videoSource": "https://www.youtube.com/@RollingSirrr"
     
-    IMPORTANT: Return ONLY raw JSON.`,
+    IMPORTANT: Keep points short but comprehensive. Return ONLY raw JSON.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -439,10 +286,24 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
               required: ["id", "type", "detail", "causalBottleneck"]
             } 
           },
+          extractedFrames: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                timestamp: { type: Type.STRING },
+                description: { type: Type.STRING },
+                category: { type: Type.STRING },
+                spatialInsight: { type: Type.STRING }
+              },
+              required: ["id", "timestamp", "description", "category", "spatialInsight"]
+            }
+          },
           recommendation: { type: Type.STRING },
           videoSource: { type: Type.STRING }
         },
-        required: ["observations", "recommendation", "videoSource"]
+        required: ["observations", "extractedFrames", "recommendation", "videoSource"]
       }
     }
   });
@@ -453,7 +314,7 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
 export const getTamilTextSummary = async (shop: Shop) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Describe ${shop.name} (${shop.cuisine}) in exactly ONE short sentence that combines Tamil and English. Use slang like 'Machi' or 'Veralevel'.`,
+    contents: `Write a hyper-local, enthusiastic summary of ${shop.name} (${shop.cuisine}) in both Tamil and English. Focus on the vibe and why people love it. Use street slang like 'Machi' and 'Veralevel'.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -472,7 +333,7 @@ export const getTamilAudioSummary = async (shop: Shop) => {
   const summary = await getTamilTextSummary(shop);
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Cheerfully: ${summary.tamil}` }] }],
+    contents: [{ parts: [{ text: `Cheerfully in Tamil: ${summary.tamil}` }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } }
@@ -484,13 +345,13 @@ export const getTamilAudioSummary = async (shop: Shop) => {
 export const generateVendorBio = async (name: string, cuisine: string) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Create a short ONE sentence marketing bio for a street food vendor named "${name}" selling "${cuisine}".`,
+    contents: `Create a punchy, short 2-sentence marketing bio for a street food vendor named "${name}" who sells "${cuisine}".`,
   });
   return (response.text || "").trim();
 };
 
 export const spatialAlertAgent = async (vendorName: string, location: LatLng) => {
-  const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized broadcast message in Tamil. KEEP IT TO ONE SHORT SENTENCE.`;
+  const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized broadcast message in Tamil.`;
   const textResponse = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,

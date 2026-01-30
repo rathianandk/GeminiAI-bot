@@ -42,7 +42,7 @@ export interface VendorProfile {
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Supervisor';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
 }
@@ -53,8 +53,6 @@ export interface ChatMessage {
   text: string;
   isThinking?: boolean;
   sources?: GroundingSource[];
-  triggeredAgents?: string[];
-  thoughtProcess?: string;
 }
 
 export interface GroundingSource {
@@ -69,8 +67,17 @@ export interface LensObservation {
   causalBottleneck: string;
 }
 
+export interface LensFrame {
+  id: string;
+  timestamp: string;
+  description: string;
+  category: 'Landscape' | 'Sidewalk' | 'Boundary' | 'Perspective';
+  spatialInsight: string;
+}
+
 export interface LensAnalysis {
   observations: LensObservation[];
+  extractedFrames: LensFrame[];
   recommendation: string;
   videoSource: string;
 }
