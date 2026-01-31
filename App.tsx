@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
 import { 
@@ -11,7 +12,8 @@ import {
   spatialLensAnalysis, 
   generateSpatialAnalytics,
   getFlavorGenealogy,
-  parseOrderAgent
+  parseOrderAgent,
+  predictFootfallAgent
 } from './services/geminiService';
 import { 
   Shop, 
@@ -175,6 +177,10 @@ export default function App() {
   const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
   const [isHistoryMining, setIsHistoryMining] = useState(false);
 
+  // --- Predictive Footfall State ---
+  const [footfallPrediction, setFootfallPrediction] = useState<string | null>(null);
+  const [isPredictingFootfall, setIsPredictingFootfall] = useState(false);
+
   // --- Ordering Flow States ---
   const [isOrdering, setIsOrdering] = useState(false);
   const [orderStep, setOrderStep] = useState<'menu' | 'verifying' | 'placed'>('menu');
@@ -305,7 +311,17 @@ export default function App() {
     setActiveShop(shop);
     setLocation(shop.coords);
     setIsVoiceActive(true);
+    setFootfallPrediction(null);
+    setIsPredictingFootfall(true);
+
     getTamilAudioSummary(shop).then(data => data ? playVoice(data) : setIsVoiceActive(false));
+    
+    predictFootfallAgent(shop, shop.coords).then(prediction => {
+      setFootfallPrediction(prediction);
+      setIsPredictingFootfall(false);
+      addLog('Spatial', `Predictive Reasoning Engine synced for ${shop.name}.`, 'resolved');
+    });
+
     getTamilTextSummary(shop).then(summary => addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved'));
     startLensAnalysisInternal(shop);
   };
@@ -513,6 +529,41 @@ export default function App() {
     }
   };
 
+  const handleChatSubmit = async (text: string) => {
+    if (!text.trim()) return;
+    const i = text;
+    setChatInput(''); 
+    // Fix: explicitly type arithmetic operation to avoid RHS type error.
+    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now() + 1).toString(), role: 'model', text: '', isThinking: true }]);
+    const res = await chatAgent(i, location);
+    setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
+  };
+
+  const handleChatVoice = () => {
+    const R = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!R) {
+      alert("Speech recognition not supported in this browser.");
+      return;
+    }
+    const r = new R();
+    r.lang = chatLang;
+    r.onstart = () => setIsListening(true);
+    r.onend = () => setIsListening(false);
+    r.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript;
+      handleChatSubmit(transcript);
+    };
+    r.start();
+  };
+
+  // derived state for grid analysis
+  const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
+  // Fix: added missing discoveredShops definition.
+  const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
+  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
+  // Fix: explicitly typed reduce accumulators for cartTotalItems to avoid unknown operator + error.
+  const cartTotalItems = Object.values(cart).reduce((a: number, b: number) => a + b, 0);
+
   // --- Order Handling Logic ---
   const initiateOrder = () => {
     if (!activeShop?.menu || activeShop.menu.length === 0) {
@@ -586,38 +637,6 @@ export default function App() {
       setActiveShop(null); // Return to grid
     }, 4000);
   };
-
-  // --- Chat Logic ---
-  const handleChatSubmit = async (text: string) => {
-    if (!text.trim()) return;
-    const i = text;
-    setChatInput(''); 
-    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now()+1).toString(), role: 'model', text: '', isThinking: true }]);
-    const res = await chatAgent(i, location);
-    setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
-  };
-
-  const handleChatVoice = () => {
-    const R = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!R) {
-      alert("Speech recognition not supported in this browser.");
-      return;
-    }
-    const r = new R();
-    r.lang = chatLang;
-    r.onstart = () => setIsListening(true);
-    r.onend = () => setIsListening(false);
-    r.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript;
-      handleChatSubmit(transcript);
-    };
-    r.start();
-  };
-
-  const discoveredShops = shops.filter(s => s.id.startsWith('sync-'));
-  const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
-  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  const cartTotalItems = Object.values(cart).reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden selection:bg-indigo-500/30">
@@ -1328,6 +1347,21 @@ export default function App() {
                   <div className="bg-white/5 border border-white/5 p-3 md:p-4 rounded-[1.25rem] italic relative overflow-hidden shadow-inner max-h-[80px] overflow-y-auto custom-scrollbar">
                     <p className="text-xs md:text-sm text-white/80 leading-relaxed font-semibold line-clamp-2">"{activeShop.description}"</p>
                   </div>
+                  
+                  {/* Predictive Footfall Feature Integrated */}
+                  <div className="bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-2xl space-y-1">
+                    <p className="text-[8px] font-black uppercase text-indigo-400/60 tracking-[0.3em]">Predictive Footfall engine</p>
+                    {isPredictingFootfall ? (
+                      <div className="flex gap-1 items-center h-4">
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1 h-1 bg-indigo-400 rounded-full animate-bounce delay-200"></div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] font-bold text-slate-100 italic animate-in fade-in">"{footfallPrediction}"</p>
+                    )}
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3 pt-1">
                     <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[11px] font-black uppercase rounded-[1.25rem] shadow-2xl transition-all hover:shadow-white/40 flex items-center justify-center gap-3 active:scale-95">🛰️ Navigate</a>
                     {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (

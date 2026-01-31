@@ -1,7 +1,40 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+/**
+ * Predictive Footfall Agent
+ * Uses Gemini 3 to reason about expected wait times and demand based on 
+ * shop type, neighborhood, and current time context.
+ */
+export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
+  const now = new Date();
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentContext = {
+    day: days[now.getDay()],
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: `MISSION: SPATIAL PREDICTION. 
+    REASON about the expected footfall and wait time for this food node:
+    NAME: ${shop.name}
+    CUISINE: ${shop.cuisine}
+    LOCATION: ${location.lat}, ${location.lng}
+    CONTEXT: Today is ${currentContext.day}, current time is ${currentContext.time}.
+    
+    TASK: Provide a 1-sentence predictive reasoning statement about the current demand. 
+    Consider the type of food (snack vs meal), the neighborhood's typical patterns (e.g., Mylapore is busy during temple hours, Triplicane is busy for Biryani at night), and current timing. 
+    
+    EXAMPLE STYLE: "It's Friday at 7 PM and it's raining in Mylapore; expect the Bajjis at Jannal Kadai to have a 20-minute wait due to high demand for hot snacks in this weather."
+    
+    Be specific, use local flavor, and return ONLY the sentence. Do not include introductory text.`,
+  });
+  return (response.text || "").trim();
+};
 
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
