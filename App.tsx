@@ -359,31 +359,45 @@ export default function App() {
     }
   };
 
-  const handleShopSelect = async (shop: Shop) => {
-    setActiveShop(shop);
-    setLocation(shop.coords);
-    setIsVoiceActive(true);
-    setFootfallPrediction(null);
-    setIsPredictingFootfall(true);
+const handleShopSelect = async (shop: Shop) => {
+  // 1. Immediate UI Feedback
+  setActiveShop(shop);
+  setLocation(shop.coords);
+  setIsVoiceActive(true);
+  setIsPredictingFootfall(true);
 
-    getTamilAudioSummary(shop).then(data => data ? playVoice(data) : setIsVoiceActive(false));
-    
-    predictFootfallAgent(shop, shop.coords).then(prediction => {
-      setFootfallPrediction(prediction);
-      setIsPredictingFootfall(false);
-      addLog('Spatial', `Predictive Reasoning Engine synced for ${shop.name}.`, 'resolved');
-    });
+  // 2. Fetch the text summary ONCE
+  const summary = await getTamilTextSummary(shop);
 
-    getTamilTextSummary(shop).then(summary => addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved'));
-    startLensAnalysisInternal(shop);
-  };
+  // 3. Fire off dependent tasks in parallel
+  // Start Audio (using the summary we already have)
+
+  getTamilAudioSummary(shop).then(data => {
+      if (data) {
+        playVoice(data); // This should set setIsSpeaking(true) internally
+      }
+      // We keep isVoiceActive true so the wave/stop button stays visible
+      // Only set to false if data fails to load
+      if (!data) setIsVoiceActive(false);
+    }).catch(() => setIsVoiceActive(false));
+  // Log the text immediately (no need to wait for audio)
+  addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved');
+
+  // Prediction and Lens can run in the background
+  predictFootfallAgent(shop, shop.coords).then(prediction => {
+    setFootfallPrediction(prediction);
+    setIsPredictingFootfall(false);
+  });
+
+  startLensAnalysisInternal(shop);
+};
 
   const startLensAnalysisInternal = async (shop: Shop) => {
     setIsLensAnalyzing(true);
     setExplorerTab('lens');
     setLensAnalysis(null);
     setLensTab('extractedFrames');
-    addLog('Lens', `Performing intensive visual scrape from @RollingSirrr for ${shop.name}...`, 'processing');
+    addLog('Lens', `Performing intensive visual scrape for ${shop.name}...`, 'processing');
     try {
       const analysis = await spatialLensAnalysis(shop.coords, shop.name);
       setLensAnalysis(analysis);
@@ -616,7 +630,6 @@ export default function App() {
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  // Fix: Explicitly handle potential Object.values type issues with simple typing
   const cartValues = Object.values(cart);
   const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
 
@@ -634,7 +647,6 @@ export default function App() {
   };
 
   const updateCart = (itemName: string, delta: number) => {
-    // Fix: Explicitly type the reducer prev state to avoid arithmetic right-hand side errors
     setCart((prev: Record<string, number>) => {
       const current = prev[itemName] || 0;
       const next = Math.max(0, current + delta);
@@ -678,7 +690,6 @@ export default function App() {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
       return { name, quantity, price: menuItem?.price || 0 };
     });
-    // Fix: Explicitly type acc in reduce for clarity and safety
     const totalPrice = orderItems.reduce((acc: number, curr) => acc + (curr.price * curr.quantity), 0);
     setParsedOrder({ orderItems, totalPrice });
     setOrderStep('verifying');
@@ -726,16 +737,20 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5 shadow-inner">
+          {/* Primary Mode Switcher - Modern High-Tech Style */}
+          <div className="relative flex bg-[#1a1a1a] p-1 rounded-[1.25rem] mb-6 border border-white/5 shadow-inner overflow-hidden group">
+            <div 
+               className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-gradient-to-tr transition-all duration-500 rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] ${userMode === 'vendor' ? 'translate-x-full from-emerald-600 to-emerald-500 shadow-emerald-500/20' : 'translate-x-0 from-indigo-600 to-indigo-500 shadow-indigo-500/20'}`} 
+            />
             <button 
               onClick={() => setUserMode('explorer')} 
-              className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest ${userMode === 'explorer' || userMode === 'history' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'explorer' || userMode === 'history' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
             >
-              Exp
+              Explorer
             </button>
             <button 
               onClick={() => setUserMode('vendor')} 
-              className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest ${userMode === 'vendor' ? 'bg-emerald-600 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'vendor' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
             >
               Hub
             </button>
@@ -744,18 +759,40 @@ export default function App() {
           {(userMode === 'explorer' || userMode === 'history') ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20">
+                <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg">
                   {isMining ? <SetupAnimation /> : 'Run Food Scrape'}
                 </button>
-                <button onClick={() => setExplorerTab('live_vendors')} className={`py-4 bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
-                   Live Partners ({liveVendors.length})
+                <button onClick={() => setExplorerTab('live_vendors')} className={`py-4 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
+                   Live Signals ({liveVendors.length})
                 </button>
               </div>
-              <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
-                <button onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Intel</button>
-                <button onClick={() => { setUserMode('explorer'); setExplorerTab('discovery'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Legends</button>
-                <button onClick={() => { setUserMode('explorer'); setExplorerTab('lens'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Lens</button>
-                <button onClick={() => { setUserMode('explorer'); setExplorerTab('live_vendors'); }} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-md transition-all ${userMode === 'explorer' && explorerTab === 'live_vendors' ? 'bg-white/10 text-white shadow-inner' : 'text-white/20 hover:text-white/40'}`}>Partners</button>
+              
+              {/* Explorer Sub-Tab Switcher - Cool Transparent Style */}
+              <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-inner">
+                <button 
+                  onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} 
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                >
+                  Intel
+                </button>
+                <button 
+                  onClick={() => { setUserMode('explorer'); setExplorerTab('discovery'); }} 
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                >
+                  Legends
+                </button>
+                <button 
+                  onClick={() => { setUserMode('explorer'); setExplorerTab('lens'); }} 
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'text-white/20 hover:text-white/40'}`}
+                >
+                  Lens
+                </button>
+                <button 
+                  onClick={() => { setUserMode('explorer'); setExplorerTab('live_vendors'); }} 
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'live_vendors' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                >
+                  Vendor
+                </button>
               </div>
             </div>
           ) : (
@@ -1102,6 +1139,14 @@ export default function App() {
                   </div>
                 ) : explorerTab === 'lens' ? (
                   <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
+                    {/* Header in Lens tab showing target name */}
+                    <div className="px-2 py-4 bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-1 items-center justify-center text-center">
+                       <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Active Lens Target</p>
+                       <h4 className="text-[14px] font-black text-white uppercase tracking-tighter">
+                         {activeShop ? activeShop.name : "Waiting for Node Signal..."}
+                       </h4>
+                    </div>
+
                     {isLensAnalyzing ? (
                       <div className="flex-1 flex flex-col items-center justify-center space-y-6 py-20">
                         <div className="relative w-24 h-24">
