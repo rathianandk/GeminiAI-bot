@@ -645,10 +645,24 @@ export default function App() {
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-sm font-black tracking-[0.4em] text-white">GEOMIND AI</h1>
             <div className="flex gap-2">
-              <button onClick={() => setUserMode('explorer')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'explorer' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-white/40'}`}>Explorer</button>
-              <button onClick={() => setUserMode('vendor')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'vendor' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white/5 text-white/40'}`}>Partner Hub</button>
               <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
             </div>
+          </div>
+
+          {/* Exp/Hub Toggle Button */}
+          <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5 shadow-inner">
+            <button 
+              onClick={() => setUserMode('explorer')} 
+              className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest ${userMode === 'explorer' || userMode === 'history' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+            >
+              Exp
+            </button>
+            <button 
+              onClick={() => setUserMode('vendor')} 
+              className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all uppercase tracking-widest ${userMode === 'vendor' ? 'bg-emerald-600 text-white shadow-lg' : 'text-white/40 hover:text-white/60'}`}
+            >
+              Hub
+            </button>
           </div>
           
           {(userMode === 'explorer' || userMode === 'history') ? (
@@ -1012,27 +1026,11 @@ export default function App() {
                     ) : lensAnalysis ? (
                       <div className="flex-1 flex flex-col overflow-hidden">
                         <div className="flex gap-1 bg-white/5 p-1 rounded-xl shrink-0 mb-4">
-                          <button onClick={() => setLensTab('extractedFrames')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'extractedFrames' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Frames</button>
                           <button onClick={() => setLensTab('observations')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'observations' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Observations</button>
                           <button onClick={() => setLensTab('synthesis')} className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all ${lensTab === 'synthesis' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/20 hover:text-white/40'}`}>Strategy</button>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2 pb-10">
-                          {lensTab === 'extractedFrames' ? (
-                            lensAnalysis.extractedFrames.map((frame, i) => (
-                              <div key={i} className="p-4 rounded-3xl bg-white/5 border border-white/5 space-y-3 border-l-4 border-l-indigo-600 shadow-sm animate-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 30}ms` }}>
-                                 <div className="flex justify-between items-center">
-                                    <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${
-                                      frame.category === 'Landscape' ? 'bg-emerald-500/10 text-emerald-400' :
-                                      frame.category === 'Sidewalk' ? 'bg-cyan-500/10 text-cyan-400' :
-                                      frame.category === 'Boundary' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
-                                    }`}>{frame.category} Node</span>
-                                    <span className="text-white/20 text-[8px] font-black tabular-nums tracking-widest">F:{frame.timestamp}</span>
-                                 </div>
-                                 <h5 className="text-[11px] font-black text-white uppercase leading-tight tracking-tight">{frame.description}</h5>
-                                 <p className="text-[9px] text-slate-400 italic bg-black/20 p-3 rounded-xl border border-white/5">"Insight: {frame.spatialInsight}"</p>
-                              </div>
-                            ))
-                          ) : lensTab === 'observations' ? (
+                          {lensTab === 'observations' ? (
                             lensAnalysis.observations.map((obs, i) => (
                               <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 group hover:bg-white/10 transition-all animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 30}ms` }}>
                                 <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase tracking-widest ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : obs.type === 'flow' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>{obs.type}</span>
