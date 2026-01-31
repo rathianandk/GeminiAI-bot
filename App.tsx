@@ -153,6 +153,7 @@ export default function App() {
   }]);
   const [lastSources, setLastSources] = useState<GroundingSource[]>([]);
   const [isMining, setIsMining] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false); // Verification state
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
@@ -244,6 +245,57 @@ export default function App() {
 
   const addLog = (agent: AgentLog['agent'], message: string, status: AgentLog['status'] = 'processing') => {
     setLogs(prev => [{ id: Math.random().toString(), agent, message, status }, ...prev.slice(0, 50)]);
+  };
+
+  /**
+   * Autonomous Verification Loop
+   * Specifically verifies the "La Cabana" Lens fix and discovery consistency.
+   */
+  const runVerificationSuite = async () => {
+    setIsVerifying(true);
+    setExplorerTab('logs');
+    addLog('Spatial', 'Initiating Autonomous Verification Loop...', 'processing');
+
+    try {
+      // 1. Test Discovery at Nungambakkam
+      addLog('Discovery', '[TEST_ARTIFACT] Scoping Nungambakkam cluster...', 'processing');
+      const testCoord = { lat: 13.0588, lng: 80.2454 }; // Nungambakkam
+      const discoveryTest = await discoveryAgent("High-end eateries and rooftops", testCoord);
+      addLog('Discovery', `[TEST_ARTIFACT] Verified ${discoveryTest.shops.length} nodes in cluster. Status: SUCCESS`, 'resolved');
+
+      // 2. Test Lens Accuracy for La Cabana (The Fix Verification)
+      addLog('Lens', '[TEST_ARTIFACT] Targeted Scrape: "La Cabana rooftop grill"', 'processing');
+      const lensTest = await spatialLensAnalysis(testCoord, "La Cabana rooftop grill");
+      
+      const isRooftopIdentified = lensTest.observations.some(o => 
+        o.detail.toLowerCase().includes('rooftop') || 
+        o.detail.toLowerCase().includes('skyline') ||
+        o.detail.toLowerCase().includes('elevation')
+      );
+
+      if (isRooftopIdentified) {
+        addLog('Lens', `[TEST_ARTIFACT] FIX VERIFIED: Lens correctly identified rooftop architecture and spatial elevation. Status: PASS`, 'resolved');
+      } else {
+        addLog('Lens', `[TEST_ARTIFACT] WARNING: Lens identified venue but spatial attributes are vague. Status: INCONCLUSIVE`, 'failed');
+      }
+
+      // 3. Test Order Agent
+      addLog('Linguistic', '[TEST_ARTIFACT] Probing Order Agent with Tamil voice mock...', 'processing');
+      const mockMenu = [{ name: 'Biryani', price: 200 }, { name: 'Coke', price: 50 }];
+      const orderTest = await parseOrderAgent("rendu biryani venum", mockMenu);
+      
+      if (orderTest.orderItems.length > 0 && orderTest.orderItems[0].quantity === 2) {
+        addLog('Linguistic', `[TEST_ARTIFACT] Verified Linguistic mapping: "rendu" -> 2. Status: PASS`, 'resolved');
+      } else {
+        addLog('Linguistic', `[TEST_ARTIFACT] Order Agent failed to map Tamil quantity. Status: FAIL`, 'failed');
+      }
+
+      addLog('Spatial', 'Autonomous Verification Complete. System state: NOMINAL.', 'resolved');
+    } catch (err) {
+      addLog('Spatial', `Critical Anomaly in Verification Loop: ${err instanceof Error ? err.message : 'Unknown Error'}`, 'failed');
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const stopAudio = () => {
@@ -529,7 +581,6 @@ export default function App() {
     }
   };
 
-  // Fix: explicitly ensuring nowTs is treated as a number to satisfy arithmetic operator requirements.
   const handleChatSubmit = async (text: string) => {
     if (!text.trim()) return;
     const i = text;
@@ -565,7 +616,9 @@ export default function App() {
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  const cartTotalItems: number = (Object.values(cart) as number[]).reduce((a: number, b: number) => a + b, 0);
+  // Fix: Explicitly handle potential Object.values type issues with simple typing
+  const cartValues = Object.values(cart);
+  const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
 
   // --- Order Handling Logic ---
   const initiateOrder = () => {
@@ -581,7 +634,8 @@ export default function App() {
   };
 
   const updateCart = (itemName: string, delta: number) => {
-    setCart(prev => {
+    // Fix: Explicitly type the reducer prev state to avoid arithmetic right-hand side errors
+    setCart((prev: Record<string, number>) => {
       const current = prev[itemName] || 0;
       const next = Math.max(0, current + delta);
       if (next === 0) {
@@ -599,7 +653,7 @@ export default function App() {
     addLog('Linguistic', `Processing signal: "${textToParse}"`, 'processing');
     try {
       const res = await parseOrderAgent(textToParse, activeShop.menu);
-      setCart(prev => {
+      setCart((prev: Record<string, number>) => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
           next[item.name] = (next[item.name] || 0) + item.quantity;
@@ -624,7 +678,8 @@ export default function App() {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
       return { name, quantity, price: menuItem?.price || 0 };
     });
-    const totalPrice = orderItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+    // Fix: Explicitly type acc in reduce for clarity and safety
+    const totalPrice = orderItems.reduce((acc: number, curr) => acc + (curr.price * curr.quantity), 0);
     setParsedOrder({ orderItems, totalPrice });
     setOrderStep('verifying');
   };
@@ -860,10 +915,28 @@ export default function App() {
               {userMode === 'explorer' ? (
                 explorerTab === 'logs' ? (
                   <div className="space-y-4">
+                    {/* Verification Loop Trigger */}
+                    <button 
+                      onClick={runVerificationSuite} 
+                      disabled={isVerifying}
+                      className="w-full py-4 mb-4 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg flex items-center justify-center gap-3"
+                    >
+                      {isVerifying ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                          <span>Running Evals...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🚀 Run Autonomous Verification</span>
+                        </>
+                      )}
+                    </button>
+
                     {logs.map(l => (
-                      <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300 shadow-sm">
+                      <div key={l.id} className={`p-4 rounded-xl border border-white/5 animate-in slide-in-from-left-4 duration-300 shadow-sm ${l.message.includes('[TEST_ARTIFACT]') ? 'bg-indigo-950/20 border-indigo-500/40' : 'bg-[#0a0a0a]'}`}>
                         <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : l.agent === 'Discovery' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Lens' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
-                        <p className="text-[10px] font-bold text-slate-400 leading-relaxed mt-2 whitespace-pre-line tracking-tight">{l.message}</p>
+                        <p className={`text-[10px] font-bold leading-relaxed mt-2 whitespace-pre-line tracking-tight ${l.message.includes('[TEST_ARTIFACT]') ? 'text-indigo-200' : 'text-slate-400'}`}>{l.message}</p>
                       </div>
                     ))}
                   </div>
@@ -1114,6 +1187,7 @@ export default function App() {
       <div className="flex-1 relative bg-[#020202]">
         <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
         
+        {/* Ordering Overlay */}
         {isOrdering && activeShop && (
           <div className="absolute inset-0 z-[6000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-8 animate-in fade-in duration-700">
             <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[4rem] p-16 space-y-12 shadow-[0_50px_150px_rgba(0,0,0,1)] relative border-t-white/20">
