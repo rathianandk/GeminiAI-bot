@@ -148,7 +148,7 @@ export default function App() {
   const [logs, setLogs] = useState<AgentLog[]>([{
     id: 'init-1',
     agent: 'Linguistic',
-    message: 'Vanakkam! GeoMind initialized with street-level accuracy.',
+    message: 'Vanakkam! gStrEats EyAI initialized with street-level accuracy.',
     status: 'resolved'
   }]);
   const [lastSources, setLastSources] = useState<GroundingSource[]>([]);
@@ -529,12 +529,17 @@ export default function App() {
     }
   };
 
+  // Fix: explicitly ensuring nowTs is treated as a number to satisfy arithmetic operator requirements.
   const handleChatSubmit = async (text: string) => {
     if (!text.trim()) return;
     const i = text;
     setChatInput(''); 
-    // Fix: explicitly type arithmetic operation to avoid RHS type error.
-    setChatHistory(prev => [...prev, { id: Date.now().toString(), role: 'user', text: i }, { id: (Date.now() + 1).toString(), role: 'model', text: '', isThinking: true }]);
+    const nowTs = Date.now();
+    setChatHistory(prev => [
+      ...prev, 
+      { id: nowTs.toString(), role: 'user', text: i }, 
+      { id: (nowTs + 1).toString(), role: 'model', text: '', isThinking: true }
+    ]);
     const res = await chatAgent(i, location);
     setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
   };
@@ -558,11 +563,9 @@ export default function App() {
 
   // derived state for grid analysis
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
-  // Fix: added missing discoveredShops definition.
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  // Fix: explicitly typed reduce accumulators for cartTotalItems to avoid unknown operator + error.
-  const cartTotalItems = Object.values(cart).reduce((a: number, b: number) => a + b, 0);
+  const cartTotalItems: number = (Object.values(cart) as number[]).reduce((a: number, b: number) => a + b, 0);
 
   // --- Order Handling Logic ---
   const initiateOrder = () => {
@@ -662,13 +665,12 @@ export default function App() {
       <div className="w-[450px] border-r border-white/5 bg-[#080808] flex flex-col z-20 shadow-2xl overflow-hidden">
         <div className="p-8 border-b border-white/5 shrink-0">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-sm font-black tracking-[0.4em] text-white">GEOMIND AI</h1>
+            <h1 className="text-sm font-black tracking-[0.4em] text-white">gStrEats EyAI</h1>
             <div className="flex gap-2">
               <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
             </div>
           </div>
 
-          {/* Exp/Hub Toggle Button */}
           <div className="flex bg-white/5 p-1 rounded-xl mb-6 border border-white/5 shadow-inner">
             <button 
               onClick={() => setUserMode('explorer')} 
@@ -802,7 +804,6 @@ export default function App() {
                           </div>
                           <p className="text-[11px] font-black text-slate-100 leading-relaxed drop-shadow-sm bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
                           <div className="bg-amber-950/20 p-5 rounded-3xl border border-amber-500/20 space-y-5 group-hover:bg-amber-900/10 transition-all shadow-inner">
-                            {/* Notable Ingredients Section */}
                             <div className="space-y-3">
                               <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest flex items-center gap-2">
                                 <span className="w-1 h-1 bg-amber-400 rounded-full"></span>
@@ -817,7 +818,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Popular Food Items Section */}
                             <div className="space-y-3">
                               <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                                 <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
@@ -889,7 +889,6 @@ export default function App() {
                       </div>
                     ) : (
                       <>
-                        {/* Tab Toggle */}
                         <div className="flex bg-[#0a0a0a] p-1.5 rounded-2xl border border-white/5 shadow-inner backdrop-blur-md">
                           <button 
                             onClick={() => setDiscoverySubTab('nodes')} 
@@ -925,7 +924,6 @@ export default function App() {
                                 <p className="text-[11px] font-bold text-slate-100 leading-relaxed group-hover:text-indigo-50 transition-colors">"{analytics.sectorSummary}"</p>
                               </div>
 
-                              {/* Cuisine Distribution */}
                               <div className="space-y-4">
                                 <p className="text-[10px] font-black text-indigo-400/80 uppercase tracking-[0.4em] drop-shadow-md">Cuisine Proliferation</p>
                                 <div className="space-y-3">
@@ -943,7 +941,6 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* Price Spectrum */}
                               <div className="space-y-4">
                                 <p className="text-[10px] font-black text-emerald-400/80 uppercase tracking-[0.4em] drop-shadow-md">Energy Cost Spectrum</p>
                                 <div className="grid grid-cols-1 gap-3">
@@ -960,7 +957,6 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* Legendary Index */}
                               <div className="space-y-4">
                                 <p className="text-[10px] font-black text-amber-400/80 uppercase tracking-[0.4em] drop-shadow-md">High-Sentiment Legends</p>
                                 <div className="space-y-3">
@@ -979,7 +975,6 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* Segmentation */}
                               <div className="space-y-4">
                                 <p className="text-[10px] font-black text-cyan-400/80 uppercase tracking-[0.4em] drop-shadow-md">Grid Segmentation</p>
                                 <div className="grid grid-cols-1 gap-3">
@@ -1119,7 +1114,6 @@ export default function App() {
       <div className="flex-1 relative bg-[#020202]">
         <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
         
-        {/* Ordering Overlay - Enhanced Cart & Language Interaction */}
         {isOrdering && activeShop && (
           <div className="absolute inset-0 z-[6000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-8 animate-in fade-in duration-700">
             <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[4rem] p-16 space-y-12 shadow-[0_50px_150px_rgba(0,0,0,1)] relative border-t-white/20">
@@ -1154,7 +1148,6 @@ export default function App() {
                     ))}
                   </div>
 
-                  {/* Cart Summary */}
                   {cartTotalItems > 0 && (
                     <div className="bg-emerald-600/10 border border-emerald-500/20 p-6 rounded-[2rem] flex justify-between items-center animate-in slide-in-from-bottom-2">
                        <div className="flex gap-2 items-center">
@@ -1348,7 +1341,6 @@ export default function App() {
                     <p className="text-xs md:text-sm text-white/80 leading-relaxed font-semibold line-clamp-2">"{activeShop.description}"</p>
                   </div>
                   
-                  {/* Predictive Footfall Feature Integrated */}
                   <div className="bg-indigo-600/10 border border-indigo-500/20 p-4 rounded-2xl space-y-1">
                     <p className="text-[8px] font-black uppercase text-indigo-400/60 tracking-[0.3em]">Predictive Footfall engine</p>
                     {isPredictingFootfall ? (
@@ -1384,7 +1376,7 @@ export default function App() {
             <div className="w-full h-full bg-[#080808]/98 backdrop-blur-3xl border border-white/10 rounded-[4rem] flex flex-col overflow-hidden shadow-[0_60px_180px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-500 border-t-white/20">
               <div className="p-12 bg-white/5 border-b border-white/5 flex justify-between items-center">
                 <div className="flex flex-col">
-                  <h3 className="text-[14px] font-black text-white tracking-[0.6em] uppercase">GeoMind Voice</h3>
+                  <h3 className="text-[14px] font-black text-white tracking-[0.6em] uppercase">gStrEats EyAI Voice</h3>
                   <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-3 opacity-60">Spatial Reasoning Engine</p>
                 </div>
                 <div className="bg-black/50 p-2 rounded-2xl flex border border-white/10 shadow-inner">

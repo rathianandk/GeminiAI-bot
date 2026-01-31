@@ -1,5 +1,5 @@
 {
-  "name": "GeoMind: Street Food Intelligence",
+  "name": "gStrEats EyAI: Street Food Intelligence",
   "description": "A spatial discovery engine for local street food vendors and landmarks.",
   "requestFramePermissions": [
     "camera",

@@ -285,23 +285,24 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
     contents: `MISSION: 'Lens Mode' Intensive Spatial Intelligence Scrape for "${shopName}" at (${location.lat}, ${location.lng}).
-    DATA SOURCE: @RollingSirrr Visual Database.
     
-    Identify key frames from the video that demonstrate the spatial intelligence and urban integration of the street food stall. Specifically, focus on images that show:
-    1. The natural landscape integration, such as the use of mature trees for shade (the 'green roof' effect).
-    2. The sidewalk layout, showing how the stall utilizes public pathways for dining without blocking pedestrian flow.
-    3. The boundary management, including how parked vehicles (scooters) or physical structures define the eating area from the active road.
-    
-    Look for frames that illustrate the compact efficiency of the cart, the proxemics of the customers, and the environmental cooling provided by trees.
+    TASK:
+    1. Use Google Search to find accurate spatial and visual details for this establishment. 
+    2. Specifically, determine if it is a street cart, a rooftop venue (like La Cabana in Nungambakkam), or an indoor eatery.
+    3. Analyze the urban integration:
+       - If rooftop: Focus on panoramic visibility, structural elevation, and "Sky-Dining" flow.
+       - If street stall: Focus on sidewalk proxemics, tree shade integration, and cart efficiency.
+       - If indoor: Focus on interior zoning and entrance/boundary management.
     
     Return a JSON object with:
-    - "observations": Array of 10-15 detailed LensObservation objects.
-    - "extractedFrames": Array of 5-8 LensFrame objects (descriptions of the visual data).
-    - "recommendation": A synthesized urban planning strategy.
-    - "videoSource": "https://www.youtube.com/@RollingSirrr"
+    - "observations": Array of 10-15 detailed LensObservation objects grounding the establishment in its real layout.
+    - "extractedFrames": Array of 5-8 LensFrame objects (vivid descriptions of what a camera sees at the location).
+    - "recommendation": A synthesized urban planning/spatial strategy.
+    - "videoSource": Link to a relevant visual reference (e.g. @RollingSirrr or restaurant's official tour).
     
-    IMPORTANT: Keep points short but comprehensive. Return ONLY raw JSON.`,
+    IMPORTANT: Provide ONLY high-precision observations. Ground the response in real Google Search data for "${shopName}". Return ONLY raw JSON.`,
     config: {
+      tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
