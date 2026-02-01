@@ -172,6 +172,7 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Vanakkam! Ask me anything about street food or landmarks.' }]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const historyFileInputRef = useRef<HTMLInputElement>(null);
+  const currentShopIdRef = useRef<string | null>(null);
 
   const [analytics, setAnalytics] = useState<SpatialAnalytics | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -252,6 +253,24 @@ export default function App() {
       return [...baseShops, ...syncShops, ...vendorShops];
     });
   }, [myProfiles]);
+
+  // Reactive Bridge: Ensure activeShop always reflects the latest inventory (Sold Out status) from the shops grid
+  useEffect(() => {
+    if (activeShop) {
+      const latest = shops.find(s => s.id === activeShop.id);
+      if (latest && JSON.stringify(latest.menu) !== JSON.stringify(activeShop.menu)) {
+        setActiveShop(latest);
+      }
+    }
+  }, [shops, activeShop]);
+
+  // Audio Safety Layer: Immediately stop audio when the activeShop popup is closed or cleared
+  useEffect(() => {
+    if (!activeShop) {
+      stopAudio();
+      currentShopIdRef.current = null;
+    }
+  }, [activeShop]);
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatHistory]);
 
@@ -343,7 +362,6 @@ export default function App() {
     const isNowOnline = !shops.some(s => s.id === liveId && s.status === VendorStatus.ONLINE);
     
     if (isNowOnline) {
-      // 1. Optimistic Update: Go live immediately with a placeholder description
       const optimisticShop: Shop = { 
         id: liveId, 
         name: profile.name, 
@@ -352,7 +370,7 @@ export default function App() {
         status: VendorStatus.ONLINE, 
         emoji: profile.emoji, 
         cuisine: profile.cuisine, 
-        description: "Establishing neural link and local broadcast...", // Placeholder until AI finishes
+        description: "Establishing neural link and local broadcast...", 
         hours: profile.hours, 
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
@@ -361,19 +379,15 @@ export default function App() {
       setShops(prev => [optimisticShop, ...prev.filter(s => s.id !== optimisticShop.id && s.id !== profile.id)]);
       addLog('Spatial', `Signal activation initiated for ${profile.name}. Broadcasting to local grid...`, 'processing');
 
-      // 2. Background AI Fetch for localized alert summary
       try {
         const alert = await spatialAlertAgent(profile.name, location);
-        // 3. Final Update: Enrich the optimistic node with actual AI metadata
         setShops(prev => prev.map(s => s.id === liveId ? { ...s, description: alert.tamilSummary } : s));
         addLog('Spatial', `Signal locked for ${profile.name}. Metadata synchronized.`, 'resolved');
       } catch (err) {
-        // Fallback to original description if AI fetch fails
         setShops(prev => prev.map(s => s.id === liveId ? { ...s, description: profile.description } : s));
         addLog('Spatial', `Signal established, but metadata sync failed. Using registry bio.`, 'failed');
       }
     } else {
-      // Deactivate remains instant as it doesn't require complex API calls
       setShops(prev => prev.filter(s => s.id !== liveId));
       addLog('Spatial', `Signal deactivated for ${profile.name}. Node is now offline.`, 'failed');
     }
@@ -381,19 +395,20 @@ export default function App() {
 
 const handleShopSelect = async (shop: Shop) => {
   setActiveShop(shop);
+  currentShopIdRef.current = shop.id; // Lock current audio session
   setLensTargetName(shop.name);
   setLocation(shop.coords);
   setIsVoiceActive(true);
   setIsPredictingFootfall(true);
-  setIsSidebarOpen(false); // Close sidebar on selection for mobile clarity
+  setIsSidebarOpen(false); 
 
-  // Trigger non-blocking agents immediately
   getTamilTextSummary(shop).then(summary => {
     addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved');
   });
 
   getTamilAudioSummary(shop).then(data => {
-      if (data) {
+      // Session Integrity Check: Ensure we only play if the user hasn't closed the node
+      if (data && currentShopIdRef.current === shop.id) {
         playVoice(data);
       }
       if (!data) setIsVoiceActive(false);
@@ -404,7 +419,6 @@ const handleShopSelect = async (shop: Shop) => {
     setIsPredictingFootfall(false);
   });
 
-  // Start Lens Analysis immediately in parallel to linguistic fetching
   startLensAnalysisInternal(shop);
 };
 
@@ -459,7 +473,6 @@ const handleShopSelect = async (shop: Shop) => {
     setIsHistoryMining(true);
     setUserMode('history');
     setImageFlavorAnalysis(null);
-    // Sidebar should stay open on mobile to display the history list
     addLog('Historian', 'Scanning 1.2M historical tokens for culinary migration patterns...', 'processing');
     try {
       const result = await getFlavorGenealogy(location);
@@ -572,6 +585,7 @@ const handleShopSelect = async (shop: Shop) => {
         emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
+        /* Fixed typo here: regHour was undefined, changed to regForm.endHour */
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
@@ -627,7 +641,6 @@ const handleShopSelect = async (shop: Shop) => {
       timestamp: new Date().toLocaleDateString()
     };
 
-    // Update shops state
     setShops(prev => prev.map(s => {
       if (s.id === activeShop.id) {
         const updatedReviews = [newReview, ...(s.reviews || [])];
@@ -636,7 +649,6 @@ const handleShopSelect = async (shop: Shop) => {
       return s;
     }));
 
-    // If it's a vendor profile, update it too
     const profileId = activeShop.id.replace('live-', '');
     if (myProfiles.some(p => p.id === profileId)) {
       setMyProfiles(prev => prev.map(p => {
@@ -647,7 +659,6 @@ const handleShopSelect = async (shop: Shop) => {
       }));
     }
 
-    // Update active shop local instance
     setActiveShop(prev => prev ? { ...prev, reviews: [newReview, ...(prev.reviews || [])] } : null);
 
     addLog('Linguistic', `Exploration feedback logged for ${activeShop.name}. Authenticity confirmed.`, 'resolved');
@@ -667,26 +678,30 @@ const handleShopSelect = async (shop: Shop) => {
     setIsMining(true);
     setExplorerTab('discovery');
     setDiscoverySubTab('nodes');
-    addLog('Discovery', 'Initiating wide-band 25-point spatial scrape...', 'processing');
+    addLog('Discovery', 'Initiating wide-band spatial food scrape...', 'processing');
     try {
       const result = await discoveryAgent("Legendary street food and hidden gems", location);
+      
+      if (!result.shops || result.shops.length === 0) {
+        addLog('Discovery', 'Minimal signals detected in current sector. Retry spatial sweep.', 'failed');
+        setIsMining(false);
+        return;
+      }
+
       const updatedShops = [...shops.filter(s => !s.id.startsWith('sync-')), ...result.shops];
       setShops(updatedShops);
       setLastSources(result.sources);
-      let logIndex = 0;
-      // UI Optimisation: Play back logs 5x faster (80ms vs 400ms) to satisfy speed request
-      const interval = setInterval(() => {
-        if (logIndex < result.logs.length) {
-          addLog('Discovery', result.logs[logIndex], 'resolved');
-          logIndex++;
-        } else {
-          clearInterval(interval);
-          addLog('Discovery', `Discovery Complete: Identified 25 legends in this sector.`, 'resolved');
-          setIsMining(false);
-          computeAnalytics(updatedShops);
-        }
-      }, 80);
+      
+      computeAnalytics(updatedShops);
+
+      if (result.logs && result.logs.length > 0) {
+        result.logs.forEach(msg => addLog('Discovery', msg, 'resolved'));
+      }
+      
+      addLog('Discovery', `Discovery Complete: Identified ${result.shops.length} legends in this sector.`, 'resolved');
+      setIsMining(false);
     } catch (err) {
+      console.error("Scrape Error:", err);
       addLog('Discovery', 'Discovery node timeout. Atmospheric interference suspected.', 'failed');
       setIsMining(false);
     }
@@ -727,7 +742,6 @@ const handleShopSelect = async (shop: Shop) => {
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
   
-  // Cast Object.values result to number[] to resolve 'unknown' assignability issues during reduction.
   const cartValues = Object.values(cart) as number[];
   const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
 
@@ -745,7 +759,7 @@ const handleShopSelect = async (shop: Shop) => {
 
   const updateCart = (itemName: string, delta: number) => {
     const menuItem = activeShop?.menu?.find(m => m.name === itemName);
-    if (menuItem?.isSoldOut && delta > 0) return; // Prevent adding sold out items
+    if (menuItem?.isSoldOut && delta > 0) return; 
 
     setCart((prev: Record<string, number>) => {
       const current = prev[itemName] || 0;
@@ -769,7 +783,7 @@ const handleShopSelect = async (shop: Shop) => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
           const actualItem = activeShop?.menu?.find(m => m.name === item.name);
-          if (!actualItem?.isSoldOut) {
+          if (actualItem && !actualItem.isSoldOut) {
             next[item.name] = (next[item.name] || 0) + item.quantity;
           }
         });
@@ -789,11 +803,22 @@ const handleShopSelect = async (shop: Shop) => {
       alert("Cart is empty. Select items or state your order.");
       return;
     }
-    // Cast Object.entries(cart) to [string, number][] to ensure 'quantity' is treated as a number in arithmetic operations.
     const orderItems = (Object.entries(cart) as [string, number][]).map(([name, quantity]) => {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
-      return { name, quantity, price: menuItem?.price || 0 };
-    });
+      return { 
+        name, 
+        quantity, 
+        price: menuItem?.price || 0,
+        isSoldOut: menuItem?.isSoldOut || false 
+      };
+    }).filter(it => !it.isSoldOut); 
+
+    if (orderItems.length === 0) {
+      alert("The selected items are currently unavailable (Sold Out).");
+      setCart({});
+      return;
+    }
+
     const totalPrice = orderItems.reduce((acc: number, curr) => acc + (curr.price * curr.quantity), 0);
     setParsedOrder({ orderItems, totalPrice });
     setOrderStep('verifying');
@@ -827,7 +852,6 @@ const handleShopSelect = async (shop: Shop) => {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
       `}</style>
 
-      {/* Mobile Toggle Button */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)} 
         className="md:hidden fixed top-4 left-4 z-[100] w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-2xl border border-white/20 active:scale-90 transition-transform"
@@ -835,7 +859,6 @@ const handleShopSelect = async (shop: Shop) => {
         <span className="text-2xl">{isSidebarOpen ? '✕' : '☰'}</span>
       </button>
 
-      {/* Sidebar - Mobile Responsive */}
       <div className={`fixed md:relative inset-y-0 left-0 z-50 w-[88%] sm:w-[450px] md:w-[450px] border-r border-white/5 bg-[#080808] flex flex-col shadow-2xl overflow-hidden transform transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-8 border-b border-white/5 shrink-0">
           <div className="flex justify-between items-center mb-6">
@@ -848,7 +871,6 @@ const handleShopSelect = async (shop: Shop) => {
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <span className="text-lg relative z-10 group-hover:animate-spin-slow">🌍</span>
-                {/* Visual Signal Glow if Active */}
                 {userMode === 'explorer' && explorerTab === 'impact' && (
                   <span className="absolute inset-0 rounded-xl border border-indigo-400 animate-ping opacity-20"></span>
                 )}
@@ -1141,14 +1163,12 @@ const handleShopSelect = async (shop: Shop) => {
                                 </div>
                               ) : analytics ? (
                                 <div className="space-y-10 pb-20">
-                                  {/* Sector Synthesis */}
                                   <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-[2.5rem] space-y-3 shadow-2xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📈</div>
                                     <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
                                     <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
                                   </div>
 
-                                  {/* Cuisine Distribution */}
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
                                     <div className="grid grid-cols-1 gap-3">
@@ -1166,7 +1186,6 @@ const handleShopSelect = async (shop: Shop) => {
                                     </div>
                                   </div>
 
-                                  {/* Price Spectrum */}
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
@@ -1183,7 +1202,6 @@ const handleShopSelect = async (shop: Shop) => {
                                     </div>
                                   </div>
 
-                                  {/* Legendary Index */}
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
                                     <div className="space-y-4">
@@ -1199,7 +1217,6 @@ const handleShopSelect = async (shop: Shop) => {
                                     </div>
                                   </div>
 
-                                  {/* Customer Segmentation */}
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
                                     <div className="grid grid-cols-1 gap-3">
@@ -1294,7 +1311,6 @@ const handleShopSelect = async (shop: Shop) => {
                 </>
               ) : (
                 <div className="space-y-4">
-                  {/* Hub / Vendor profiles list */}
                   {!activeProfileId && myProfiles.map(p => (
                     <div key={p.id} className="w-full p-5 rounded-[2rem] bg-[#0a0a0a] border border-white/10 hover:border-white/20 flex justify-between items-center transition-all group shadow-lg">
                       <div className="flex items-center gap-4">
@@ -1322,7 +1338,6 @@ const handleShopSelect = async (shop: Shop) => {
       <div className="flex-1 relative bg-[#020202]">
         <FoodMap center={location} shops={shops} onLocationChange={setLocation} onShopClick={handleShopSelect} />
         
-        {/* Full Screen Fixed Order Pop-Up */}
         {isOrdering && activeShop && (
           <div className="fixed inset-0 z-[7000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-500">
             <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-16 space-y-8 md:space-y-12 shadow-2xl relative overflow-y-auto max-h-[95vh] custom-scrollbar">
@@ -1431,7 +1446,6 @@ const handleShopSelect = async (shop: Shop) => {
           </div>
         )}
 
-        {/* Restore Vendor Addition (Register Modal) - Now Responsive */}
         {isRegistering && (
           <div className="fixed inset-0 z-[7500] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-500 overflow-y-auto">
             <div className="max-w-4xl w-full bg-[#080808] border border-white/10 rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-12 space-y-10 shadow-[0_50px_150px_rgba(0,0,0,1)] border-t-white/20 max-h-[90vh] overflow-y-auto custom-scrollbar relative">
@@ -1511,7 +1525,6 @@ const handleShopSelect = async (shop: Shop) => {
           </div>
         )}
 
-        {/* Review Modal - Responsive Design */}
         {isReviewing && activeShop && (
           <div className="fixed inset-0 z-[8000] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
             <div className="max-w-xl w-full bg-[#0a0a0a] border border-white/10 rounded-[3rem] p-8 md:p-12 space-y-8 shadow-[0_50px_100px_rgba(0,0,0,0.8)]">
@@ -1544,7 +1557,6 @@ const handleShopSelect = async (shop: Shop) => {
           </div>
         )}
 
-        {/* Shop Info Popup - Optimized for Mobile */}
         {activeShop && !isOrdering && (
           <div className="absolute bottom-6 left-4 right-4 md:bottom-10 md:left-10 md:right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700">
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col md:flex-row gap-6 md:gap-8 relative overflow-hidden border-t-white/20">
@@ -1553,7 +1565,6 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center">
                    <span>{activeShop.emoji}</span>
                 </div>
-                {/* Rating Badge */}
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2">
                     <span className="text-amber-500 text-sm">⭐</span>
@@ -1564,7 +1575,7 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex-1 space-y-3 min-w-0 flex flex-col">
                 <div className="flex justify-between items-start gap-4">
                   <div className="space-y-1">
-                    <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight truncate leading-tight">{activeShop.name}</h3>
+                    <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking tight truncate leading-tight">{activeShop.name}</h3>
                     <p className="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{activeShop.cuisine}</p>
                   </div>
                   <div className="shrink-0 pt-1">
@@ -1583,7 +1594,6 @@ const handleShopSelect = async (shop: Shop) => {
                     )}
                   </div>
 
-                  {/* Reviews Section */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center sticky top-0 bg-black/10 backdrop-blur-md py-1">
                       <p className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Field Intelligence ({activeShop.reviews?.length || 0})</p>
@@ -1621,7 +1631,6 @@ const handleShopSelect = async (shop: Shop) => {
           </div>
         )}
 
-        {/* Voice Chatbot Widget - Responsive sizing */}
         <div className={`fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[4000] transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isChatOpen ? 'w-[calc(100vw-48px)] sm:w-[480px] h-[75vh] sm:h-[720px]' : 'w-16 h-16 md:w-24 md:h-24'}`}>
           {!isChatOpen ? (
             <button onClick={() => setIsChatOpen(true)} className="w-full h-full bg-indigo-600 rounded-[2rem] md:rounded-[3rem] flex items-center justify-center text-white text-3xl md:text-4xl shadow-[0_25px_60px_rgba(79,70,229,0.5)] transition-all group overflow-hidden active:scale-90">

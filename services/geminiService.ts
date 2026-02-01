@@ -36,29 +36,28 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
 };
 
 export const discoveryAgent = async (query: string, location: LatLng) => {
+  // We use gemini-2.5-flash as per rules for Google Maps grounding support.
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `SPATIAL DISCOVERY MISSION: Find EXACTLY 25 legendary street food spots, iconic eateries (like Jannal Kadai or Kalathi Rose Milk), and hidden gems within a 5km radius of (${location.lat}, ${location.lng}). 
+    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of (${location.lat}, ${location.lng}). 
     
     INSTRUCTIONS:
-    1. Scan Google Maps and search web results for the most authentic local food nodes.
-    2. Ensure the list is exactly 25 unique items.
-    3. For each item, provide: Name, precise lat/lng, a representative emoji, cuisine type, a 1-sentence vivid description, and a short address.
+    1. Scan Google Maps and Search for authentic food nodes.
+    2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
+    3. You MUST format the results into a valid JSON object.
     
-    OUTPUT FORMAT: You MUST return a single valid JSON object. 
+    REQUIRED JSON STRUCTURE:
     {
       "shops": [
-        { "id": "sync-1", "name": "...", "coords": {"lat": 0.0, "lng": 0.0}, "emoji": "...", "cuisine": "...", "description": "...", "address": "..." },
-        ... (repeat for all 25)
+        { "id": "sync-unique-1", "name": "Name", "coords": {"lat": 13.0, "lng": 80.0}, "emoji": "🥘", "cuisine": "Type", "description": "Story", "address": "Address" }
       ],
       "logs": [
-        "Step 1: Calibrating spatial grid...",
-        "Step 2: Scouring local food clusters...",
-        "Step 3: Extracting high-sentiment nodes..."
+        "Internal step 1 summary...",
+        "Internal step 2 summary..."
       ]
     }
     
-    CRITICAL: Return ONLY raw JSON. No markdown blocks. No introductory text like "I apologize" or "Here is the list". Only the JSON object starting with { and ending with }.`,
+    CRITICAL: Output ONLY the raw JSON object. Do not include markdown formatting or conversational filler.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -76,40 +75,39 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   let data: { shops?: any[], logs?: string[] } = { shops: [], logs: [] };
   
   if (!text) {
-    return { shops: [], logs: ["Discovery signal timeout. No response from sector."], sources: [] };
+    return { shops: [], logs: ["Discovery signal timeout. Check connectivity."], sources: [] };
   }
 
   try {
-    // Robust extraction: Find the first '{' and the last '}'
-    const startIndex = text.indexOf('{');
-    const endIndex = text.lastIndexOf('}');
-    
-    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-      const jsonCandidate = text.substring(startIndex, endIndex + 1);
-      data = JSON.parse(jsonCandidate);
+    // Advanced Extraction: Find the outermost JSON object even if wrapped in markdown
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      data = JSON.parse(jsonMatch[0]);
     } else {
-      // Fallback if no valid braces found
-      data.logs = [`No valid JSON block detected. Model output: ${text.substring(0, 50)}...`];
+      data.logs = [`No structured JSON found in telemetry. Response: ${text.substring(0, 100)}...`];
     }
   } catch (e) {
-    console.error("Failed to parse discovery JSON:", e, "Raw text:", text);
-    data.logs = ["Discovery signal received but parsing encountered an anomaly. The model might have returned conversational text instead of JSON."];
+    console.error("Discovery Parse Error:", e, text);
+    data.logs = ["Data corruption in spatial stream. Parsing failed."];
     data.shops = [];
   }
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const sources: GroundingSource[] = groundingChunks.map((c: any) => ({
-    title: c.web?.title || c.maps?.title || "Spatial Node",
+    title: c.web?.title || c.maps?.title || "Reference Node",
     uri: c.web?.uri || c.maps?.uri || "#"
   }));
 
   const sanitizedShops = (data.shops || []).map((s: any, idx: number) => ({
     ...s,
-    id: s.id?.toString().startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
-    isVendor: false
+    id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
+    isVendor: false,
+    reviews: []
   }));
 
-  return { shops: sanitizedShops as Shop[], logs: (data.logs || []) as string[], sources };
+  const resultLogs = (data.logs && data.logs.length > 0) ? data.logs : ["Grid scan successful. Visualizing nodes."];
+
+  return { shops: sanitizedShops as Shop[], logs: resultLogs as string[], sources };
 };
 
 export const analyzeFoodImage = async (base64Data: string, mimeType: string): Promise<FoodAnalysis> => {
@@ -467,7 +465,7 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Say excitedly: ${textResponse.text}` }] }],
     config: {
-      responseModalities: [Modality.AUDIO],
+      responseModalalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } }
     }
   });
