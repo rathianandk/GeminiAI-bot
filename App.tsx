@@ -175,6 +175,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [isLensAnalyzing, setIsLensAnalyzing] = useState(false);
+  const [lensTargetName, setLensTargetName] = useState<string>('');
   const [lensAnalysis, setLensAnalysis] = useState<LensAnalysis | null>(null);
   const [lensTab, setLensTab] = useState<'observations' | 'extractedFrames' | 'synthesis'>('extractedFrames');
 
@@ -358,6 +359,7 @@ export default function App() {
 
 const handleShopSelect = async (shop: Shop) => {
   setActiveShop(shop);
+  setLensTargetName(shop.name);
   setLocation(shop.coords);
   setIsVoiceActive(true);
   setIsPredictingFootfall(true);
@@ -1113,7 +1115,7 @@ const handleShopSelect = async (shop: Shop) => {
                       <div className="px-2 py-4 bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-1 items-center justify-center text-center">
                          <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Active Lens Target</p>
                          <h4 className="text-[14px] font-black text-white uppercase tracking-tighter">
-                           {activeShop?.name || "Active Node"}
+                           {lensTargetName || "Select a Food Node"}
                          </h4>
                       </div>
                       {isLensAnalyzing ? (
