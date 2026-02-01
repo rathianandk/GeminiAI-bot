@@ -938,10 +938,23 @@ const handleShopSelect = async (shop: Shop) => {
                       <div className="px-2 py-4 bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-1 items-center justify-center text-center">
                          <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Active Lens Target</p>
                          <h4 className="text-[14px] font-black text-white uppercase tracking-tighter">
-                           {activeShop ? activeShop.name : "Waiting for Node Signal..."}
+                           {activeShop?.name || "Active Node"}
                          </h4>
                       </div>
-                      {lensAnalysis ? (
+                      {isLensAnalyzing ? (
+                        <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-500">
+                          <div className="relative w-40 h-40 bg-indigo-600/5 rounded-3xl border border-indigo-500/20 overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent h-1/2 animate-scan"></div>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-5xl animate-pulse">👁️</span>
+                            </div>
+                          </div>
+                          <div className="text-center space-y-2">
+                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] animate-pulse">Analyzing Visual Nodes...</p>
+                            <p className="text-[8px] text-white/20 uppercase tracking-widest">Cross-referencing spatial metadata</p>
+                          </div>
+                        </div>
+                      ) : lensAnalysis ? (
                         <div className="space-y-4 overflow-y-auto custom-scrollbar">
                           {lensAnalysis.observations.map((obs, i) => (
                             <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
