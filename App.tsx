@@ -429,11 +429,11 @@ const handleShopSelect = async (shop: Shop) => {
     }
   };
 
-  const fetchFlavorHistory = async () => {
+  const fetchFlavorHistory = async (e: React.MouseEvent) => {
     setIsHistoryMining(true);
     setUserMode('history');
     setImageFlavorAnalysis(null);
-    setIsSidebarOpen(false); // Close sidebar on mobile
+    // Sidebar should stay open on mobile to display the history list
     addLog('Historian', 'Scanning 1.2M historical tokens for culinary migration patterns...', 'processing');
     try {
       const result = await getFlavorGenealogy(location);
@@ -701,6 +701,7 @@ const handleShopSelect = async (shop: Shop) => {
       setCart((prev: Record<string, number>) => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
+          // Fix: Resolved 'actualItem' double assignment and temporal dead zone error.
           const actualItem = activeShop?.menu?.find(m => m.name === item.name);
           if (!actualItem?.isSoldOut) {
             next[item.name] = (next[item.name] || 0) + item.quantity;
@@ -800,7 +801,7 @@ const handleShopSelect = async (shop: Shop) => {
                 <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg">
                   {isMining ? <SetupAnimation /> : 'Run Food Scrape'}
                 </button>
-                <button onClick={() => { setExplorerTab('live_vendors'); if(window.innerWidth < 768) setIsSidebarOpen(false); }} className={`py-4 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
+                <button onClick={() => { setExplorerTab('live_vendors'); }} className={`py-4 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
                    Live Signals ({liveVendors.length})
                 </button>
               </div>
