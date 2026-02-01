@@ -703,7 +703,6 @@ const handleShopSelect = async (shop: Shop) => {
       setCart((prev: Record<string, number>) => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
-          // Fix: Resolved 'actualItem' double assignment and temporal dead zone error.
           const actualItem = activeShop?.menu?.find(m => m.name === item.name);
           if (!actualItem?.isSoldOut) {
             next[item.name] = (next[item.name] || 0) + item.quantity;
@@ -845,11 +844,16 @@ const handleShopSelect = async (shop: Shop) => {
                     <button onClick={handleToggleSignal} className={`py-4 text-[10px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isCurrentlyLive ? 'bg-rose-600 text-white shadow-rose-600/30' : 'bg-emerald-600 text-white shadow-emerald-600/30'}`}>
                       {isCurrentlyLive ? 'DEACTIVATE LIVE SIGNAL' : 'ACTIVATE LIVE SIGNAL'}
                     </button>
-                    <div className="flex gap-2">
-                       <button onClick={() => syncGPS()} disabled={isUpdatingGPS} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">
-                         {isUpdatingGPS ? '...' : '🛰️ Sync GPS'}
-                       </button>
-                       <button onClick={() => activeProfile && startEditHub(activeProfile)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">Edit Node</button>
+                    <div className="space-y-1.5">
+                       <div className="text-[7px] text-indigo-400/60 font-black uppercase tracking-[0.2em] px-1 text-center">
+                         Fix: {location.lat.toFixed(6)} N, {location.lng.toFixed(6)} E
+                       </div>
+                       <div className="flex gap-2">
+                         <button onClick={() => syncGPS()} disabled={isUpdatingGPS} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">
+                           {isUpdatingGPS ? '...' : '🛰️ Sync GPS'}
+                         </button>
+                         <button onClick={() => activeProfile && startEditHub(activeProfile)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">Edit Node</button>
+                       </div>
                     </div>
                   </div>
                 </div>
