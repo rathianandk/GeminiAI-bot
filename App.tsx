@@ -845,7 +845,7 @@ const handleShopSelect = async (shop: Shop) => {
                       {isCurrentlyLive ? 'DEACTIVATE LIVE SIGNAL' : 'ACTIVATE LIVE SIGNAL'}
                     </button>
                     <div className="space-y-1.5">
-                       <div className="text-[7px] text-indigo-400/60 font-black uppercase tracking-[0.2em] px-1 text-center">
+                       <div className="text-[8px] text-indigo-300 font-black uppercase tracking-[0.2em] px-1 text-center">
                          Fix: {location.lat.toFixed(6)} N, {location.lng.toFixed(6)} E
                        </div>
                        <div className="flex gap-2">
