@@ -77,11 +77,23 @@ export interface LensFrame {
   spatialInsight: string;
 }
 
+export interface FoodAnalysis {
+  name: string;
+  protein: string;
+  calories: string;
+  carbs: string;
+  history_tags: string[];
+  authenticity_score: string;
+  narrative: string;
+  error?: string;
+}
+
 export interface LensAnalysis {
   observations: LensObservation[];
   extractedFrames: LensFrame[];
   recommendation: string;
   videoSource: string;
+  foodAnalysis?: FoodAnalysis;
 }
 
 export interface SpatialAnalytics {

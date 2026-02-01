@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem } from "../types";
+import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -114,6 +114,83 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   }));
 
   return { shops: sanitizedShops as Shop[], logs: (data.logs || []) as string[], sources };
+};
+
+export const analyzeFoodImage = async (base64Data: string, mimeType: string): Promise<FoodAnalysis> => {
+  const imagePart = {
+    inlineData: {
+      mimeType: mimeType,
+      data: base64Data,
+    },
+  };
+  const textPart = {
+    text: `MISSION: LENS MODE SPATIAL FOOD ANALYSIS.
+    FIRST: Determine if this image contains food or a street-food stall.
+    
+    IF NOT FOOD: 
+    Return PART A (Narrative): "Spatial Error: My lens is tuned for the flavor grid, but I don't see any street-food here. Point me toward a stall or a plate to unlock the genealogy."
+    Return PART B (JSON): { "error": "NOT_FOOD_DETECTED" }
+    
+    IF FOOD:
+    1. Identification: Identify the primary dish and any visible sides.
+    2. Flavour Genealogy: Trace the historical spice migration and cultural origin of this dish to the modern street corner using your 1M token context of culinary history.
+    3. Nutritional Inference: Estimate Protein (g), Calories (kcal), and Carbs (g).
+    4. Spatial Vibe: Detect the "Authenticity Level" (0-100%) based on environment/plating.
+    
+    Return the response in two strictly separated parts:
+    
+    PART A (Narrative): 
+    A 3-sentence "Local Fixer" story about the food's history and soul.
+    
+    PART B (JSON): 
+    { 
+      "name": "Dish Name", 
+      "protein": "number + g", 
+      "calories": "number + kcal", 
+      "carbs": "number + g",
+      "history_tags": ["tag1", "tag2"], 
+      "authenticity_score": "number%" 
+    }
+    
+    STRICT FORMAT: Provide PART A and then PART B as a JSON block.`,
+  };
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: { parts: [imagePart, textPart] },
+  });
+
+  const text = response.text || "";
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  
+  // Clean narrative by removing headers, labels, and backticks
+  const narrative = text
+    .replace(/\{[\s\S]*\}/, "") // Remove the JSON block
+    .replace(/PART\s*[AB]/gi, "") // Remove "PART A" or "PART B"
+    .replace(/\(?Narrative\)?[:\-]?/gi, "") // Remove "(Narrative):"
+    .replace(/\(?JSON\)?[:\-]?/gi, "") // Remove "(JSON):"
+    .replace(/```[a-z]*/gi, "") // Remove opening backticks
+    .replace(/```/gi, "") // Remove closing backticks
+    .trim();
+
+  if (jsonMatch) {
+    try {
+      const data = JSON.parse(jsonMatch[0]);
+      return { ...data, narrative };
+    } catch (e) {
+      console.error("Image Analysis JSON error:", e);
+    }
+  }
+
+  return { 
+    name: "Unknown Entity", 
+    protein: "0g", 
+    calories: "0kcal", 
+    carbs: "0g", 
+    history_tags: [], 
+    authenticity_score: "0%", 
+    narrative: narrative || "Analysis failed to produce structured data."
+  };
 };
 
 export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAnalytics> => {

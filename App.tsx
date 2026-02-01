@@ -13,7 +13,8 @@ import {
   generateSpatialAnalytics,
   getFlavorGenealogy,
   parseOrderAgent,
-  predictFootfallAgent
+  predictFootfallAgent,
+  analyzeFoodImage
 } from './services/geminiService';
 import { 
   Shop, 
@@ -27,7 +28,8 @@ import {
   LensObservation, 
   LensAnalysis, 
   SpatialAnalytics,
-  FlavorGenealogy
+  FlavorGenealogy,
+  FoodAnalysis
 } from './types';
 
 const SEED_SHOPS: Shop[] = [
@@ -168,6 +170,7 @@ export default function App() {
   const [chatLang, setChatLang] = useState<'en-US' | 'ta-IN'>('en-US');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Vanakkam! Ask me anything about street food or landmarks.' }]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const historyFileInputRef = useRef<HTMLInputElement>(null);
 
   const [analytics, setAnalytics] = useState<SpatialAnalytics | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -178,6 +181,7 @@ export default function App() {
 
   const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
   const [isHistoryMining, setIsHistoryMining] = useState(false);
+  const [imageFlavorAnalysis, setImageFlavorAnalysis] = useState<FoodAnalysis | null>(null);
 
   // --- Predictive Footfall State ---
   const [footfallPrediction, setFootfallPrediction] = useState<string | null>(null);
@@ -396,9 +400,40 @@ const handleShopSelect = async (shop: Shop) => {
     }
   };
 
+  const handleHistoryImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsHistoryMining(true);
+    setImageFlavorAnalysis(null);
+    setFlavorHistory(null);
+    addLog('Historian', `Initiating multimodal fragment genealogy for visual node...`, 'processing');
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = (e.target?.result as string).split(',')[1];
+        const res = await analyzeFoodImage(base64, file.type);
+        
+        if (res.error === "NOT_FOOD_DETECTED") {
+          addLog('Historian', res.narrative, 'failed');
+        } else {
+          setImageFlavorAnalysis(res);
+          addLog('Historian', `Identification: ${res.name}. Cross-temporal spice migration sync complete.`, 'resolved');
+        }
+        setIsHistoryMining(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      addLog('Historian', `History vision malfunction. Temporal scan aborted.`, 'failed');
+      setIsHistoryMining(false);
+    }
+  };
+
   const fetchFlavorHistory = async () => {
     setIsHistoryMining(true);
     setUserMode('history');
+    setImageFlavorAnalysis(null);
     setIsSidebarOpen(false); // Close sidebar on mobile
     addLog('Historian', 'Scanning 1.2M historical tokens for culinary migration patterns...', 'processing');
     try {
@@ -625,7 +660,8 @@ const handleShopSelect = async (shop: Shop) => {
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  const cartValues = Object.values(cart);
+  // FIX: Cast Object.values result to number[] to resolve 'unknown' assignability issues during reduction.
+  const cartValues = Object.values(cart) as number[];
   const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
 
   const initiateOrder = () => {
@@ -686,7 +722,8 @@ const handleShopSelect = async (shop: Shop) => {
       alert("Cart is empty. Select items or state your order.");
       return;
     }
-    const orderItems = Object.entries(cart).map(([name, quantity]) => {
+    // FIX: Cast Object.entries(cart) to [string, number][] to ensure 'quantity' is treated as a number in arithmetic operations.
+    const orderItems = (Object.entries(cart) as [string, number][]).map(([name, quantity]) => {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
       return { name, quantity, price: menuItem?.price || 0 };
     });
@@ -814,7 +851,11 @@ const handleShopSelect = async (shop: Shop) => {
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { setIsEditing(false); setIsRegistering(true); }} className="w-full py-12 border border-dashed border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/5 text-indigo-400/60 hover:text-indigo-400 text-[10px] font-black uppercase rounded-[3rem] transition-all group overflow-hidden relative shadow-inner">
+                <button onClick={() => { 
+                  setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '' });
+                  setIsEditing(false); 
+                  setIsRegistering(true); 
+                }} className="w-full py-12 border border-dashed border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/5 text-indigo-400/60 hover:text-indigo-400 text-[10px] font-black uppercase rounded-[3rem] transition-all group overflow-hidden relative shadow-inner">
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <span className="flex flex-col items-center gap-3 relative z-10">
                     <span className="text-4xl opacity-40 group-hover:opacity-100 transition-all duration-700">🏬</span>
@@ -829,47 +870,104 @@ const handleShopSelect = async (shop: Shop) => {
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {userMode === 'history' ? (
             <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-              <div className="flex justify-between items-center px-1">
-                <span className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em]">Cross-Temporal Synthesis</span>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em]">Cross-Temporal Synthesis</span>
+                </div>
+                <button 
+                  onClick={() => historyFileInputRef.current?.click()}
+                  className="w-full py-4 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase rounded-2xl shadow-lg hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center gap-3"
+                >
+                  📷 Trace Visual Genealogy
+                </button>
+                <input 
+                  type="file" 
+                  ref={historyFileInputRef} 
+                  onChange={handleHistoryImageUpload} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
               </div>
+
               {isHistoryMining ? (
                 <div className="py-20 flex flex-col items-center justify-center space-y-6">
                   <div className="text-5xl animate-bounce">🕰️</div>
                   <p className="text-[11px] font-black text-amber-400 uppercase tracking-[0.5em] text-center animate-pulse">REASONING OVER HISTORICAL TOKENS...</p>
                 </div>
-              ) : flavorHistory ? (
-                <div className="space-y-12 pb-20">
-                  <div className="p-6 bg-amber-950/40 border border-amber-500/40 rounded-3xl relative overflow-hidden group shadow-2xl">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-3">{flavorHistory.neighborhood} Evolution</h3>
-                    <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{flavorHistory.summary}"</p>
-                  </div>
-                  <div className="relative pl-10 space-y-12">
-                    <div className="absolute left-3 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 via-amber-400/40 to-transparent rounded-full"></div>
-                    {flavorHistory.timeline.map((era, i) => (
-                      <div key={i} className="relative group">
-                        <div className="absolute -left-10 top-1.5 w-7 h-7 bg-amber-950 border-4 border-amber-400 rounded-full z-10 shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
-                        <div className="space-y-4">
-                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] block">{era.period}</span>
-                          <h4 className="text-[16px] font-black text-white uppercase tracking-tight">{era.profile}</h4>
-                          <p className="text-[11px] font-black text-slate-100 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
-                          <div className="bg-amber-950/20 p-5 rounded-3xl border border-amber-500/20 space-y-5">
-                            <div className="space-y-3">
-                              <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Notable Staples</p>
-                              <div className="flex flex-wrap gap-2.5">
-                                {era.popularItems.map((item, j) => (
-                                  <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase">
-                                    {item}
-                                  </span>
-                                ))}
+              ) : (
+                <>
+                  {imageFlavorAnalysis && (
+                    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+                      <div className="p-6 bg-amber-950/40 border border-amber-500/40 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <h3 className="text-xl font-black text-white uppercase tracking-tighter">{imageFlavorAnalysis.name}</h3>
+                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Authenticity Grid: {imageFlavorAnalysis.authenticity_score}</p>
+                          </div>
+                        </div>
+                        <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{imageFlavorAnalysis.narrative}"</p>
+                        
+                        <div className="grid grid-cols-3 gap-3 pt-2">
+                           <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Protein</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.protein}</p>
+                           </div>
+                           <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Energy</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.calories}</p>
+                           </div>
+                           <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Carbs</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.carbs}</p>
+                           </div>
+                        </div>
+
+                        <p className="text-[9px] text-amber-300 font-bold italic mt-2 animate-pulse">* Nutritional data is an AI estimate for educational purposes</p>
+
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          {imageFlavorAnalysis.history_tags.map((tag, i) => (
+                            <span key={i} className="text-[8px] px-3 py-1.5 bg-amber-500/10 text-amber-300 font-black uppercase rounded-xl border border-amber-500/20">#{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {flavorHistory && !imageFlavorAnalysis && (
+                    <div className="space-y-12 pb-20 animate-in fade-in duration-700">
+                      <div className="p-6 bg-amber-950/40 border border-amber-500/40 rounded-3xl relative overflow-hidden group shadow-2xl">
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-3">{flavorHistory.neighborhood} Evolution</h3>
+                        <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{flavorHistory.summary}"</p>
+                      </div>
+                      <div className="relative pl-10 space-y-12">
+                        <div className="absolute left-3 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 via-amber-400/40 to-transparent rounded-full"></div>
+                        {flavorHistory.timeline.map((era, i) => (
+                          <div key={i} className="relative group">
+                            <div className="absolute -left-10 top-1.5 w-7 h-7 bg-amber-950 border-4 border-amber-400 rounded-full z-10 shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
+                            <div className="space-y-4">
+                              <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] block">{era.period}</span>
+                              <h4 className="text-[16px] font-black text-white uppercase tracking-tight">{era.profile}</h4>
+                              <p className="text-[11px] font-black text-slate-100 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
+                              <div className="bg-amber-950/20 p-5 rounded-3xl border border-amber-500/20 space-y-5">
+                                <div className="space-y-3">
+                                  <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Notable Staples</p>
+                                  <div className="flex flex-wrap gap-2.5">
+                                    {era.popularItems.map((item, j) => (
+                                      <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase">
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : (
             <div className="pb-20">
