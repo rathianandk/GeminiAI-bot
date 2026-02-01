@@ -44,7 +44,7 @@ export interface VendorProfile {
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Impact';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
 }

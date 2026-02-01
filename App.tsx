@@ -158,7 +158,7 @@ export default function App() {
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
-  const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'analytics'>('discovery');
+  const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'impact'>('impact');
   const [discoverySubTab, setDiscoverySubTab] = useState<'nodes' | 'intelligence'>('nodes');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -809,6 +809,12 @@ const handleShopSelect = async (shop: Shop) => {
               
               <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-inner">
                 <button 
+                  onClick={() => { setUserMode('explorer'); setExplorerTab('impact'); }} 
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'impact' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'text-white/20 hover:text-white/40'}`}
+                >
+                  Impact
+                </button>
+                <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} 
                   className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
                 >
@@ -822,7 +828,7 @@ const handleShopSelect = async (shop: Shop) => {
                 </button>
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('lens'); }} 
-                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-white/10 text-white' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Lens
                 </button>
@@ -980,7 +986,53 @@ const handleShopSelect = async (shop: Shop) => {
             <div className="pb-20">
               {userMode === 'explorer' ? (
                 <>
-                  {explorerTab === 'logs' ? (
+                  {explorerTab === 'impact' ? (
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                      <div className="p-6 bg-indigo-950/20 border border-indigo-500/20 rounded-[2rem] space-y-4">
+                         <div className="flex items-center gap-3">
+                            <span className="text-2xl">🌍</span>
+                            <h3 className="text-[14px] font-black text-white uppercase tracking-tighter">Mission: Street Visibility</h3>
+                         </div>
+                         <p className="text-[11px] font-bold text-slate-400 leading-relaxed">
+                           In Tamil Nadu, street vendors are the backbone of the urban grid. However, a massive digital divide exists.
+                         </p>
+                         <div className="grid grid-cols-2 gap-3 pt-2">
+                           <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-1">
+                             <p className="text-[18px] font-black text-rose-500 leading-none">300K</p>
+                             <p className="text-[7px] font-black uppercase text-rose-400/60 tracking-widest">Govt Identified</p>
+                           </div>
+                           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
+                             <p className="text-[18px] font-black text-emerald-500 leading-none">500K+</p>
+                             <p className="text-[7px] font-black uppercase text-emerald-400/60 tracking-widest">Estimated Total</p>
+                           </div>
+                         </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.4em] px-2">The Solution: EyAI</h4>
+                        <div className="space-y-3">
+                          {[
+                            { icon: '📡', title: 'Live Grid Sync', desc: 'Allowing half a million vendors to broadcast their location.' },
+                            { icon: '🧠', title: 'Spatial Reasoning', desc: 'Gemini-powered wait time and footfall predictions.' },
+                            { icon: '📜', title: 'Flavor Genealogy', desc: 'Tracing the cultural migration of street food icons.' }
+                          ].map((item, i) => (
+                            <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex gap-4 items-start">
+                              <span className="text-xl bg-white/5 p-2 rounded-xl">{item.icon}</span>
+                              <div className="space-y-1">
+                                <p className="text-[11px] font-black text-white uppercase tracking-tight">{item.title}</p>
+                                <p className="text-[9px] text-slate-500 leading-relaxed">{item.desc}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-6 bg-gradient-to-br from-indigo-600/20 to-transparent border border-indigo-500/30 rounded-[2.5rem] text-center space-y-2 shadow-2xl">
+                         <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest">Target Objective</p>
+                         <p className="text-[14px] font-black text-white uppercase tracking-tighter italic">"Syncing 500,000 Micro-Economies"</p>
+                      </div>
+                    </div>
+                  ) : explorerTab === 'logs' ? (
                     <div className="space-y-4">
                       <button onClick={runVerificationSuite} disabled={isVerifying} className="w-full py-4 mb-4 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg flex items-center justify-center gap-3">
                         {isVerifying ? "Running Evals..." : "🚀 Run Autonomous Verification"}
