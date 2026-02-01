@@ -334,9 +334,10 @@ export default function App() {
     if (!profile) return;
     const liveId = `live-${profile.id}`;
     const isNowOnline = !shops.some(s => s.id === liveId && s.status === VendorStatus.ONLINE);
+    
     if (isNowOnline) {
-      const alert = await spatialAlertAgent(profile.name, location);
-      const liveShop: Shop = { 
+      // 1. Optimistic Update: Go live immediately with a placeholder description
+      const optimisticShop: Shop = { 
         id: liveId, 
         name: profile.name, 
         coords: location, 
@@ -344,14 +345,27 @@ export default function App() {
         status: VendorStatus.ONLINE, 
         emoji: profile.emoji, 
         cuisine: profile.cuisine, 
-        description: alert.tamilSummary, 
+        description: "Establishing neural link and local broadcast...", // Placeholder until AI finishes
         hours: profile.hours, 
         menu: profile.menu,
         youtubeLink: profile.youtubeLink
       };
-      setShops(prev => [liveShop, ...prev.filter(s => s.id !== liveShop.id && s.id !== profile.id)]);
-      addLog('Spatial', `Signal activated for ${profile.name}. Vendor is now live on grid.`, 'resolved');
+      setShops(prev => [optimisticShop, ...prev.filter(s => s.id !== optimisticShop.id && s.id !== profile.id)]);
+      addLog('Spatial', `Signal activation initiated for ${profile.name}. Broadcasting to local grid...`, 'processing');
+
+      // 2. Background AI Fetch for localized alert summary
+      try {
+        const alert = await spatialAlertAgent(profile.name, location);
+        // 3. Final Update: Enrich the optimistic node with actual AI metadata
+        setShops(prev => prev.map(s => s.id === liveId ? { ...s, description: alert.tamilSummary } : s));
+        addLog('Spatial', `Signal locked for ${profile.name}. Metadata synchronized.`, 'resolved');
+      } catch (err) {
+        // Fallback to original description if AI fetch fails
+        setShops(prev => prev.map(s => s.id === liveId ? { ...s, description: profile.description } : s));
+        addLog('Spatial', `Signal established, but metadata sync failed. Using registry bio.`, 'failed');
+      }
     } else {
+      // Deactivate remains instant as it doesn't require complex API calls
       setShops(prev => prev.filter(s => s.id !== liveId));
       addLog('Spatial', `Signal deactivated for ${profile.name}. Node is now offline.`, 'failed');
     }
