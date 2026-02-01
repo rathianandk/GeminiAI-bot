@@ -626,6 +626,7 @@ const handleShopSelect = async (shop: Shop) => {
       setShops(updatedShops);
       setLastSources(result.sources);
       let logIndex = 0;
+      // UI Optimisation: Play back logs 5x faster (80ms vs 400ms) to satisfy speed request
       const interval = setInterval(() => {
         if (logIndex < result.logs.length) {
           addLog('Discovery', result.logs[logIndex], 'resolved');
@@ -636,7 +637,7 @@ const handleShopSelect = async (shop: Shop) => {
           setIsMining(false);
           computeAnalytics(updatedShops);
         }
-      }, 400);
+      }, 80);
     } catch (err) {
       addLog('Discovery', 'Discovery node timeout. Atmospheric interference suspected.', 'failed');
       setIsMining(false);
