@@ -43,7 +43,7 @@ const SEED_PROFILES: VendorProfile[] = [
     cuisine: 'Biryani', 
     description: 'Triplicane wood-fired legacy.', 
     lastLocation: { lat: 13.0585, lng: 80.2730 }, 
-    menu: [{ name: 'Mutton Biryani', price: 250 }, { name: 'Chicken 65', price: 120 }],
+    menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00'
   }
 ];
@@ -512,7 +512,6 @@ const handleShopSelect = async (shop: Shop) => {
         emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
-        // Fixed typo: replaced regHour with regForm to access correct state property
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink
@@ -539,13 +538,21 @@ const handleShopSelect = async (shop: Shop) => {
     if (!newItem.name || !newItem.price) return;
     setRegForm(prev => ({
       ...prev,
-      menu: [...prev.menu, { name: newItem.name, price: parseInt(newItem.price) }]
+      menu: [...prev.menu, { name: newItem.name, price: parseInt(newItem.price), isSoldOut: false }]
     }));
     setNewItem({ name: '', price: '' });
   };
 
   const removeMenuItem = (index: number) => {
     setRegForm(prev => ({ ...prev, menu: prev.menu.filter((_, i) => i !== index) }));
+  };
+
+  const toggleMenuItemSoldOut = (index: number) => {
+    setRegForm(prev => {
+      const newMenu = [...prev.menu];
+      newMenu[index] = { ...newMenu[index], isSoldOut: !newMenu[index].isSoldOut };
+      return { ...prev, menu: newMenu };
+    });
   };
 
   const generateBio = async () => {
@@ -634,6 +641,9 @@ const handleShopSelect = async (shop: Shop) => {
   };
 
   const updateCart = (itemName: string, delta: number) => {
+    const menuItem = activeShop?.menu?.find(m => m.name === itemName);
+    if (menuItem?.isSoldOut && delta > 0) return; // Prevent adding sold out items
+
     setCart((prev: Record<string, number>) => {
       const current = prev[itemName] || 0;
       const next = Math.max(0, current + delta);
@@ -655,11 +665,14 @@ const handleShopSelect = async (shop: Shop) => {
       setCart((prev: Record<string, number>) => {
         const next = { ...prev };
         res.orderItems.forEach((item: any) => {
-          next[item.name] = (next[item.name] || 0) + item.quantity;
+          const actualItem = activeShop?.menu?.find(m => m.name === item.name);
+          if (!actualItem?.isSoldOut) {
+            next[item.name] = (next[item.name] || 0) + item.quantity;
+          }
         });
         return next;
       });
-      addLog('Linguistic', `Manifest updated from voice grid. Added ${res.orderItems.length} entities.`, 'resolved');
+      addLog('Linguistic', `Manifest updated from voice grid. Added entities.`, 'resolved');
       setOrderInput(''); 
     } catch (e) {
       addLog('Linguistic', `Signal decoding failed. Re-state requirements.`, 'failed');
@@ -1008,15 +1021,17 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500">
                   <div className="grid grid-cols-1 gap-3 md:gap-4 max-h-[300px] md:max-h-[400px] overflow-y-auto custom-scrollbar pr-2 md:pr-4">
                     {activeShop.menu?.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-4 md:p-6 bg-white/5 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] hover:bg-white/10 transition-all">
+                      <div key={idx} className={`flex justify-between items-center p-4 md:p-6 bg-white/5 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] hover:bg-white/10 transition-all ${item.isSoldOut ? 'opacity-50 grayscale' : ''}`}>
                         <div className="flex flex-col">
-                          <span className="text-[14px] md:text-[16px] font-black text-white uppercase tracking-tight">{item.name}</span>
+                          <span className="text-[14px] md:text-[16px] font-black text-white uppercase tracking-tight">
+                            {item.name} {item.isSoldOut && <span className="ml-2 text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded-lg">SOLD OUT</span>}
+                          </span>
                           <span className="text-[12px] md:text-[13px] font-black text-emerald-400">₹{item.price}</span>
                         </div>
                         <div className="flex items-center gap-4 md:gap-6">
-                          <button onClick={() => updateCart(item.name, -1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90">-</button>
+                          <button onClick={() => updateCart(item.name, -1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>-</button>
                           <span className={`text-lg md:text-xl font-black w-6 md:w-8 text-center ${cart[item.name] ? 'text-indigo-400' : 'text-white/20'}`}>{cart[item.name] || 0}</span>
-                          <button onClick={() => updateCart(item.name, 1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90">+</button>
+                          <button onClick={() => updateCart(item.name, 1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>+</button>
                         </div>
                       </div>
                     ))}
@@ -1143,9 +1158,17 @@ const handleShopSelect = async (shop: Shop) => {
                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Inventory Manifest (Menu)</label>
                     <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 min-h-[200px] flex flex-col gap-3 custom-scrollbar overflow-y-auto max-h-[350px]">
                       {regForm.menu.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white/10 p-4 rounded-2xl group animate-in slide-in-from-left-2">
-                          <span className="text-[12px] font-black text-white uppercase tracking-tight">{item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span></span>
-                          <button onClick={() => removeMenuItem(idx)} className="text-white/20 group-hover:text-rose-500 p-1 transition-colors">✕</button>
+                        <div key={idx} className={`flex justify-between items-center bg-white/10 p-4 rounded-2xl group animate-in slide-in-from-left-2 transition-all ${item.isSoldOut ? 'border-rose-500/50' : 'border-transparent'}`}>
+                          <div className="flex flex-col">
+                            <span className={`text-[12px] font-black uppercase tracking-tight ${item.isSoldOut ? 'text-slate-500 line-through' : 'text-white'}`}>{item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span></span>
+                            {item.isSoldOut && <span className="text-[8px] font-black text-rose-500 uppercase">OFF-SHELF</span>}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => toggleMenuItemSoldOut(idx)} className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${item.isSoldOut ? 'bg-rose-600 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}>
+                              {item.isSoldOut ? 'Restock' : 'Sold Out'}
+                            </button>
+                            <button onClick={() => removeMenuItem(idx)} className="text-white/20 group-hover:text-rose-500 p-1 transition-colors">✕</button>
+                          </div>
                         </div>
                       ))}
                     </div>

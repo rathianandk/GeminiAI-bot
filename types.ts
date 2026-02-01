@@ -1,3 +1,4 @@
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -11,6 +12,7 @@ export enum VendorStatus {
 export interface MenuItem {
   name: string;
   price: number;
+  isSoldOut?: boolean;
 }
 
 export interface Shop {
