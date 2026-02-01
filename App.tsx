@@ -379,7 +379,10 @@ const handleShopSelect = async (shop: Shop) => {
   setIsPredictingFootfall(true);
   setIsSidebarOpen(false); // Close sidebar on selection for mobile clarity
 
-  const summary = await getTamilTextSummary(shop);
+  // Trigger non-blocking agents immediately
+  getTamilTextSummary(shop).then(summary => {
+    addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved');
+  });
 
   getTamilAudioSummary(shop).then(data => {
       if (data) {
@@ -388,13 +391,12 @@ const handleShopSelect = async (shop: Shop) => {
       if (!data) setIsVoiceActive(false);
     }).catch(() => setIsVoiceActive(false));
     
-  addLog('Linguistic', `Spatial Insight: ${summary.tamil}\n\n${summary.english}`, 'resolved');
-
   predictFootfallAgent(shop, shop.coords).then(prediction => {
     setFootfallPrediction(prediction);
     setIsPredictingFootfall(false);
   });
 
+  // Start Lens Analysis immediately in parallel to linguistic fetching
   startLensAnalysisInternal(shop);
 };
 

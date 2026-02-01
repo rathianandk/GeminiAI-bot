@@ -356,7 +356,7 @@ export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
 
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: `MISSION: 'Lens Mode' Intensive Spatial Intelligence Scrape for "${shopName}" at (${location.lat}, ${location.lng}).
     
     TASK:
