@@ -158,7 +158,7 @@ export default function App() {
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
-  const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'impact'>('impact');
+  const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'impact'>('logs');
   const [discoverySubTab, setDiscoverySubTab] = useState<'nodes' | 'intelligence'>('nodes');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isVoiceActive, setIsVoiceActive] = useState(false);
@@ -752,9 +752,11 @@ const handleShopSelect = async (shop: Shop) => {
         @keyframes siri-liquid { 0% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(0deg) scale(1); } 33% { border-radius: 30% 70% 70% 30% / 50% 60% 30% 60%; transform: rotate(120deg) scale(1.1); } 66% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; transform: rotate(240deg) scale(0.9); } 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(360deg) scale(1); } }
         @keyframes siri-liquid-alt { 0% { border-radius: 30% 70% 70% 30% / 50% 60% 30% 60%; transform: rotate(360deg) scale(1.1); } 50% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(180deg) scale(0.9); } 100% { border-radius: 30% 70% 70% 30% / 50% 60% 30% 60%; transform: rotate(0deg) scale(1.1); } }
         @keyframes scan { 0% { top: -10%; opacity: 0; } 50% { opacity: 1; } 100% { top: 110%; opacity: 0; } }
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .animate-siri-liquid { animation: siri-liquid 8s linear infinite; }
         .animate-siri-liquid-alt { animation: siri-liquid-alt 12s ease-in-out infinite; }
         .animate-scan { animation: scan 2s linear infinite; }
+        .animate-spin-slow { animation: spin-slow 12s linear infinite; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -772,7 +774,21 @@ const handleShopSelect = async (shop: Shop) => {
       <div className={`fixed md:relative inset-y-0 left-0 z-50 w-[88%] sm:w-[450px] md:w-[450px] border-r border-white/5 bg-[#080808] flex flex-col shadow-2xl overflow-hidden transform transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-8 border-b border-white/5 shrink-0">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-sm font-black tracking-[0.4em] text-white">gStrEats EyAI</h1>
+            <div className="flex items-center gap-4">
+              <h1 className="text-sm font-black tracking-[0.4em] text-white">gStrEats EyAI</h1>
+              <button 
+                onClick={() => { setUserMode('explorer'); setExplorerTab('impact'); }}
+                className={`relative w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-500 overflow-hidden group shadow-[0_0_15px_rgba(99,102,241,0.2)] ${userMode === 'explorer' && explorerTab === 'impact' ? 'bg-indigo-600 text-white shadow-indigo-600/40 scale-110' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
+                title="Mission Impact"
+              >
+                <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <span className="text-lg relative z-10 group-hover:animate-spin-slow">🌍</span>
+                {/* Visual Signal Glow if Active */}
+                {userMode === 'explorer' && explorerTab === 'impact' && (
+                  <span className="absolute inset-0 rounded-xl border border-indigo-400 animate-ping opacity-20"></span>
+                )}
+              </button>
+            </div>
             <div className="flex gap-2">
               <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
             </div>
@@ -808,12 +824,6 @@ const handleShopSelect = async (shop: Shop) => {
               </div>
               
               <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-inner">
-                <button 
-                  onClick={() => { setUserMode('explorer'); setExplorerTab('impact'); }} 
-                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'impact' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'text-white/20 hover:text-white/40'}`}
-                >
-                  Impact
-                </button>
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} 
                   className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
