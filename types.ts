@@ -1,4 +1,3 @@
-
 export interface LatLng {
   lat: number;
   lng: number;
@@ -7,6 +6,14 @@ export interface LatLng {
 export enum VendorStatus {
   ONLINE = 'online',
   OFFLINE = 'offline',
+}
+
+export interface Review {
+  id: string;
+  author: string;
+  rating: number;
+  comment: string;
+  timestamp: string;
 }
 
 export interface MenuItem {
@@ -28,6 +35,7 @@ export interface Shop {
   menu?: MenuItem[];
   hours?: string;
   youtubeLink?: string;
+  reviews?: Review[];
 }
 
 export interface VendorProfile {
@@ -40,6 +48,7 @@ export interface VendorProfile {
   menu: MenuItem[];
   hours: string;
   youtubeLink?: string;
+  reviews?: Review[];
 }
 
 export interface AgentLog {

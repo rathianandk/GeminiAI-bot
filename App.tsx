@@ -28,12 +28,13 @@ import {
   LensAnalysis, 
   SpatialAnalytics,
   FlavorGenealogy,
-  FoodAnalysis
+  FoodAnalysis,
+  Review
 } from './types';
 
 const SEED_SHOPS: Shop[] = [
-  { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai' },
-  { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Drinks', description: 'The most iconic Rose Milk in the city.', address: 'South Mada St, Chennai' }
+  { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai', reviews: [] },
+  { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Drinks', description: 'The most iconic Rose Milk in the city.', address: 'South Mada St, Chennai', reviews: [] }
 ];
 
 const SEED_PROFILES: VendorProfile[] = [
@@ -45,7 +46,8 @@ const SEED_PROFILES: VendorProfile[] = [
     description: 'Triplicane wood-fired legacy.', 
     lastLocation: { lat: 13.0585, lng: 80.2730 }, 
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
-    hours: '12:00 - 23:00'
+    hours: '12:00 - 23:00',
+    reviews: []
   }
 ];
 
@@ -183,6 +185,10 @@ export default function App() {
   const [isHistoryMining, setIsHistoryMining] = useState(false);
   const [imageFlavorAnalysis, setImageFlavorAnalysis] = useState<FoodAnalysis | null>(null);
 
+  // --- Review State ---
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ author: 'Machi Explorer', rating: 5, comment: '' });
+
   // --- Predictive Footfall State ---
   const [footfallPrediction, setFootfallPrediction] = useState<string | null>(null);
   const [isPredictingFootfall, setIsPredictingFootfall] = useState(false);
@@ -239,7 +245,8 @@ export default function App() {
           description: p.description,
           menu: p.menu,
           hours: p.hours,
-          youtubeLink: p.youtubeLink
+          youtubeLink: p.youtubeLink,
+          reviews: p.reviews || []
         };
       });
       return [...baseShops, ...syncShops, ...vendorShops];
@@ -348,7 +355,8 @@ export default function App() {
         description: "Establishing neural link and local broadcast...", // Placeholder until AI finishes
         hours: profile.hours, 
         menu: profile.menu,
-        youtubeLink: profile.youtubeLink
+        youtubeLink: profile.youtubeLink,
+        reviews: profile.reviews || []
       };
       setShops(prev => [optimisticShop, ...prev.filter(s => s.id !== optimisticShop.id && s.id !== profile.id)]);
       addLog('Spatial', `Signal activation initiated for ${profile.name}. Broadcasting to local grid...`, 'processing');
@@ -566,7 +574,8 @@ const handleShopSelect = async (shop: Shop) => {
         lastLocation: location,
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
-        youtubeLink: regForm.youtubeLink
+        youtubeLink: regForm.youtubeLink,
+        reviews: []
       };
       setMyProfiles(prev => [...prev, newProfile]);
       addLog('Spatial', `Initial signal for "${regForm.name}" established.`, 'resolved');
@@ -605,6 +614,45 @@ const handleShopSelect = async (shop: Shop) => {
       newMenu[index] = { ...newMenu[index], isSoldOut: !newMenu[index].isSoldOut };
       return { ...prev, menu: newMenu };
     });
+  };
+
+  const handleSaveReview = () => {
+    if (!reviewForm.comment.trim() || !activeShop) return;
+    
+    const newReview: Review = {
+      id: Date.now().toString(),
+      author: reviewForm.author,
+      rating: reviewForm.rating,
+      comment: reviewForm.comment,
+      timestamp: new Date().toLocaleDateString()
+    };
+
+    // Update shops state
+    setShops(prev => prev.map(s => {
+      if (s.id === activeShop.id) {
+        const updatedReviews = [newReview, ...(s.reviews || [])];
+        return { ...s, reviews: updatedReviews };
+      }
+      return s;
+    }));
+
+    // If it's a vendor profile, update it too
+    const profileId = activeShop.id.replace('live-', '');
+    if (myProfiles.some(p => p.id === profileId)) {
+      setMyProfiles(prev => prev.map(p => {
+        if (p.id === profileId) {
+          return { ...p, reviews: [newReview, ...(p.reviews || [])] };
+        }
+        return p;
+      }));
+    }
+
+    // Update active shop local instance
+    setActiveShop(prev => prev ? { ...prev, reviews: [newReview, ...(prev.reviews || [])] } : null);
+
+    addLog('Linguistic', `Exploration feedback logged for ${activeShop.name}. Authenticity confirmed.`, 'resolved');
+    setIsReviewing(false);
+    setReviewForm({ author: 'Machi Explorer', rating: 5, comment: '' });
   };
 
   const generateBio = async () => {
@@ -1463,15 +1511,57 @@ const handleShopSelect = async (shop: Shop) => {
           </div>
         )}
 
+        {/* Review Modal - Responsive Design */}
+        {isReviewing && activeShop && (
+          <div className="fixed inset-0 z-[8000] bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300">
+            <div className="max-w-xl w-full bg-[#0a0a0a] border border-white/10 rounded-[3rem] p-8 md:p-12 space-y-8 shadow-[0_50px_100px_rgba(0,0,0,0.8)]">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-tighter">Add Exploratory Review</h2>
+                <button onClick={() => setIsReviewing(false)} className="text-white/40 hover:text-white transition-colors">✕</button>
+              </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Alias</label>
+                  <input value={reviewForm.author} onChange={e => setReviewForm({...reviewForm, author: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Rating</label>
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button key={star} onClick={() => setReviewForm({...reviewForm, rating: star})} className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all ${reviewForm.rating >= star ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : 'bg-white/5 text-white/20'}`}>
+                        ⭐
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Commentary</label>
+                  <textarea rows={4} value={reviewForm.comment} onChange={e => setReviewForm({...reviewForm, comment: e.target.value})} placeholder="Shared knowledge regarding flavor profile..." className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 resize-none" />
+                </div>
+                <button onClick={handleSaveReview} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[12px] shadow-2xl shadow-indigo-600/20 transition-all active:scale-95">Commit Review</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Shop Info Popup - Optimized for Mobile */}
         {activeShop && !isOrdering && (
           <div className="absolute bottom-6 left-4 right-4 md:bottom-10 md:left-10 md:right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700">
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col md:flex-row gap-6 md:gap-8 relative overflow-hidden border-t-white/20">
               <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 p-2 z-20 transition-all">✕</button>
-              <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl shrink-0 mx-auto md:mx-0">
-                 <span>{activeShop.emoji}</span>
+              <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0">
+                <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center">
+                   <span>{activeShop.emoji}</span>
+                </div>
+                {/* Rating Badge */}
+                {activeShop.reviews && activeShop.reviews.length > 0 && (
+                  <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2">
+                    <span className="text-amber-500 text-sm">⭐</span>
+                    <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a, b) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
+                  </div>
+                )}
               </div>
-              <div className="flex-1 space-y-3 min-w-0">
+              <div className="flex-1 space-y-3 min-w-0 flex flex-col">
                 <div className="flex justify-between items-start gap-4">
                   <div className="space-y-1">
                     <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight truncate leading-tight">{activeShop.name}</h3>
@@ -1481,16 +1571,46 @@ const handleShopSelect = async (shop: Shop) => {
                     <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
                   </div>
                 </div>
-                <div className="max-h-[80px] overflow-y-auto custom-scrollbar">
-                   <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
-                </div>
-                {footfallPrediction && (
-                  <div className="bg-indigo-600/10 border border-indigo-500/20 p-3 md:p-4 rounded-2xl">
-                    <p className="text-[7px] md:text-[8px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
-                    <p className="text-[10px] md:text-[11px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
+                
+                <div className="flex-1 space-y-4 overflow-y-auto max-h-[160px] md:max-h-[220px] custom-scrollbar pr-2">
+                  <div className="space-y-3">
+                    <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
+                    {footfallPrediction && (
+                      <div className="bg-indigo-600/10 border border-indigo-500/20 p-3 md:p-4 rounded-2xl">
+                        <p className="text-[7px] md:text-[8px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
+                        <p className="text-[10px] md:text-[11px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+
+                  {/* Reviews Section */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center sticky top-0 bg-black/10 backdrop-blur-md py-1">
+                      <p className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Field Intelligence ({activeShop.reviews?.length || 0})</p>
+                      <button onClick={() => setIsReviewing(true)} className="text-[8px] font-black text-amber-500 uppercase hover:text-amber-400 transition-colors">+ Add Review</button>
+                    </div>
+                    <div className="space-y-3">
+                      {activeShop.reviews && activeShop.reviews.length > 0 ? (
+                        activeShop.reviews.map((rev, i) => (
+                          <div key={rev.id} className="bg-white/5 border border-white/5 p-3 rounded-2xl space-y-1.5 animate-in slide-in-from-right-4 duration-300">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] font-black text-white uppercase">{rev.author}</span>
+                              <span className="text-[9px] text-amber-500">{'⭐'.repeat(rev.rating)}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">"{rev.comment}"</p>
+                            <p className="text-[7px] text-slate-600 uppercase font-black text-right">{rev.timestamp}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-4 border border-dashed border-white/5 rounded-2xl text-center opacity-30">
+                          <p className="text-[9px] font-black uppercase tracking-widest">No exploration logs yet.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 mt-auto">
                   <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl text-center active:scale-95 transition-transform">🛰️ Navigate</a>
                   {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
                     <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl active:scale-95 transition-transform border border-emerald-400/20">🛒 Order Now</button>
