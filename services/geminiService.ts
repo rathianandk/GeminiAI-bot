@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis } from "../types";
 
@@ -46,7 +45,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     2. Ensure the list is exactly 25 unique items.
     3. For each item, provide: Name, precise lat/lng, a representative emoji, cuisine type, a 1-sentence vivid description, and a short address.
     
-    OUTPUT FORMAT: You MUST return a single JSON object. 
+    OUTPUT FORMAT: You MUST return a single valid JSON object. 
     {
       "shops": [
         { "id": "sync-1", "name": "...", "coords": {"lat": 0.0, "lng": 0.0}, "emoji": "...", "cuisine": "...", "description": "...", "address": "..." },
@@ -59,7 +58,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
       ]
     }
     
-    CRITICAL: Return ONLY the raw JSON. No markdown blocks. No extra text. No preamble about searching.`,
+    CRITICAL: Return ONLY raw JSON. No markdown blocks. No introductory text like "I apologize" or "Here is the list". Only the JSON object starting with { and ending with }.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -81,24 +80,21 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   }
 
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      let candidate = jsonMatch[0];
-      try {
-        data = JSON.parse(candidate);
-      } catch (innerE) {
-        const cleaned = candidate.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-        data = JSON.parse(cleaned);
-      }
+    // Robust extraction: Find the first '{' and the last '}'
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+    
+    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+      const jsonCandidate = text.substring(startIndex, endIndex + 1);
+      data = JSON.parse(jsonCandidate);
     } else {
-      const fixedText = text.replace(/```json|```/g, "").trim();
-      if (fixedText) {
-        data = JSON.parse(fixedText);
-      }
+      // Fallback if no valid braces found
+      data.logs = [`No valid JSON block detected. Model output: ${text.substring(0, 50)}...`];
     }
   } catch (e) {
-    console.error("Failed to parse discovery JSON:", e);
-    data.logs = ["Discovery signal received but parsing encountered an anomaly."];
+    console.error("Failed to parse discovery JSON:", e, "Raw text:", text);
+    data.logs = ["Discovery signal received but parsing encountered an anomaly. The model might have returned conversational text instead of JSON."];
+    data.shops = [];
   }
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import FoodMap from './components/Map';
 import { 
@@ -660,7 +659,8 @@ const handleShopSelect = async (shop: Shop) => {
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync'));
   const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
-  // FIX: Cast Object.values result to number[] to resolve 'unknown' assignability issues during reduction.
+  
+  // Cast Object.values result to number[] to resolve 'unknown' assignability issues during reduction.
   const cartValues = Object.values(cart) as number[];
   const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
 
@@ -722,7 +722,7 @@ const handleShopSelect = async (shop: Shop) => {
       alert("Cart is empty. Select items or state your order.");
       return;
     }
-    // FIX: Cast Object.entries(cart) to [string, number][] to ensure 'quantity' is treated as a number in arithmetic operations.
+    // Cast Object.entries(cart) to [string, number][] to ensure 'quantity' is treated as a number in arithmetic operations.
     const orderItems = (Object.entries(cart) as [string, number][]).map(([name, quantity]) => {
       const menuItem = activeShop?.menu?.find(m => m.name === name);
       return { name, quantity, price: menuItem?.price || 0 };
@@ -998,22 +998,98 @@ const handleShopSelect = async (shop: Shop) => {
                             <button onClick={() => setDiscoverySubTab('nodes')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Nodes</button>
                             <button onClick={() => setDiscoverySubTab('intelligence')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Intelligence</button>
                           </div>
-                          {discoverySubTab === 'intelligence' && analytics ? (
+                          {discoverySubTab === 'intelligence' && (
                             <div className="space-y-8 animate-in fade-in duration-700">
-                              <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-3xl space-y-3 shadow-2xl relative overflow-hidden">
-                                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
-                                <p className="text-[11px] font-bold text-slate-100 leading-relaxed">"{analytics.sectorSummary}"</p>
-                              </div>
-                              <div className="grid grid-cols-1 gap-4">
-                                 {analytics.legendaryIndex?.map((l, i) => (
-                                    <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex justify-between items-center">
-                                       <span className="text-[11px] font-black text-white uppercase">{l.name}</span>
-                                       <span className="text-indigo-400 font-black">{l.score}</span>
+                              {isAnalyzing ? (
+                                <div className="py-20 flex flex-col items-center justify-center space-y-8">
+                                  <div className="text-6xl animate-spin">📊</div>
+                                  <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse text-center">GENERATING SPATIAL INSIGHTS...</p>
+                                </div>
+                              ) : analytics ? (
+                                <div className="space-y-10 pb-20">
+                                  {/* Sector Synthesis */}
+                                  <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-[2.5rem] space-y-3 shadow-2xl relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📈</div>
+                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
+                                    <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
+                                  </div>
+
+                                  {/* Cuisine Distribution */}
+                                  <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
+                                    <div className="grid grid-cols-1 gap-3">
+                                      {analytics.cuisineDistribution.map((c, i) => (
+                                        <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-2">
+                                          <div className="flex justify-between items-center text-[11px] font-black uppercase">
+                                            <span className="text-white">{c.label}</span>
+                                            <span className="text-indigo-400">{c.percentage}%</span>
+                                          </div>
+                                          <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${c.percentage}%` }}></div>
+                                          </div>
+                                        </div>
+                                      ))}
                                     </div>
-                                 ))}
-                              </div>
+                                  </div>
+
+                                  {/* Price Spectrum */}
+                                  <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
+                                    <div className="grid grid-cols-1 gap-4">
+                                      {analytics.priceSpectrum.map((p, i) => (
+                                        <div key={i} className="p-5 bg-white/5 border border-white/5 rounded-[2rem] space-y-3">
+                                          <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">{p.range}</h4>
+                                          <div className="flex flex-wrap gap-2">
+                                            {p.nodes.map((node, j) => (
+                                              <span key={j} className="text-[9px] px-3 py-1 bg-white/5 border border-white/10 text-white/60 rounded-lg">{node}</span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Legendary Index */}
+                                  <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
+                                    <div className="space-y-4">
+                                      {analytics.legendaryIndex.map((l, i) => (
+                                        <div key={i} className="p-5 bg-indigo-600/5 border border-indigo-500/20 rounded-[2rem] space-y-2 transition-all hover:bg-indigo-600/10">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[13px] font-black text-white uppercase tracking-tight">{l.name}</span>
+                                            <span className="text-[14px] font-black text-indigo-400">{l.score}</span>
+                                          </div>
+                                          <p className="text-[10px] text-slate-400 italic leading-relaxed">"{l.reasoning}"</p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Customer Segmentation */}
+                                  <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
+                                    <div className="grid grid-cols-1 gap-3">
+                                      {analytics.customerSegmentation.map((s, i) => (
+                                        <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center gap-4">
+                                          <div className="w-10 h-10 shrink-0 bg-white/10 rounded-xl flex items-center justify-center font-black text-white text-[10px]">{s.volume}%</div>
+                                          <div className="flex-1 min-w-0">
+                                             <p className="text-[11px] font-black text-white uppercase truncate">{s.segment}</p>
+                                             <p className="text-[9px] text-slate-500 truncate">{s.description}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="py-20 text-center opacity-20">
+                                  <p className="text-[10px] font-black uppercase tracking-widest">No Intelligence Data available in this sector.</p>
+                                  <button onClick={() => computeAnalytics()} className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[9px] font-black uppercase transition-all">Manual Sync</button>
+                                </div>
+                              )}
                             </div>
-                          ) : (
+                          )}
+                          {discoverySubTab === 'nodes' && (
                             <div className="space-y-4 pt-4">
                               {discoveredShops.map((s, i) => (
                                 <button key={s.id} onClick={() => handleShopSelect(s)} className="w-full p-6 rounded-[2.5rem] bg-indigo-950/10 hover:bg-indigo-600/20 border border-indigo-500/10 text-left transition-all group flex items-center gap-5">
