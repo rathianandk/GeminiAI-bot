@@ -51,8 +51,20 @@ const SEED_SHOPS: Shop[] = [
     description: 'Legendary window-service spot in Mylapore.', 
     address: 'Mylapore, Chennai', 
     reviews: [], 
-    safetyMetrics: { crimeSafety: 92, policeProximity: 65, footfallIntensity: 88, lighting: 70, vibe: 95 },
-    urbanLogistics: { transitAccessibility: 75, walkabilityScore: 90, parkingAvailability: 30 },
+    safetyMetrics: { 
+      crimeSafety: 92, 
+      policeProximity: 65, 
+      footfallIntensity: 88, 
+      lighting: 70, 
+      vibe: 95, 
+      nearestPoliceStations: ["Mylapore Police Station", "Abhiramapuram Police Station"] 
+    },
+    urbanLogistics: { 
+      transitAccessibility: 75, 
+      walkabilityScore: 90, 
+      parkingAvailability: 30, 
+      publicTransportNodes: ["Mylapore Bus Terminus", "Thirumayilai Railway Station"] 
+    },
     predictedFootfall: [
       { period: "6am-10am", volume: 20 },
       { period: "11am-2pm", volume: 45 },
@@ -71,8 +83,20 @@ const SEED_SHOPS: Shop[] = [
     description: 'The most iconic Rose Milk in the city.', 
     address: 'South Mada St, Chennai', 
     reviews: [], 
-    safetyMetrics: { crimeSafety: 95, policeProximity: 85, footfallIntensity: 60, lighting: 95, vibe: 90 },
-    urbanLogistics: { transitAccessibility: 80, walkabilityScore: 95, parkingAvailability: 20 },
+    safetyMetrics: { 
+      crimeSafety: 95, 
+      policeProximity: 85, 
+      footfallIntensity: 60, 
+      lighting: 95, 
+      vibe: 90, 
+      nearestPoliceStations: ["Mylapore Police Station"] 
+    },
+    urbanLogistics: { 
+      transitAccessibility: 80, 
+      walkabilityScore: 95, 
+      parkingAvailability: 20, 
+      publicTransportNodes: ["South Mada St Bus Stop", "Thirumayilai Railway Station"] 
+    },
     predictedFootfall: [
       { period: "6am-10am", volume: 10 },
       { period: "11am-2pm", volume: 60 },
@@ -94,8 +118,8 @@ const SEED_PROFILES: VendorProfile[] = [
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00',
     reviews: [],
-    safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85 },
-    urbanLogistics: { transitAccessibility: 85, walkabilityScore: 70, parkingAvailability: 45 },
+    safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85, nearestPoliceStations: ["Triplicane Police Station"] },
+    urbanLogistics: { transitAccessibility: 85, walkabilityScore: 70, parkingAvailability: 45, publicTransportNodes: ["Triplicane High Road Bus Stop", "Government Estate Metro"] },
     predictedFootfall: [
       { period: "6am-10am", volume: 5 },
       { period: "11am-2pm", volume: 80 },
@@ -447,6 +471,7 @@ export default function App() {
   const [isMining, setIsMining] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false); 
   const [activeShop, setActiveShop] = useState<Shop | null>(null);
+  const [lensShopData, setLensShopData] = useState<Shop | null>(null); // State to persist data for Lens tab
   const [location, setLocation] = useState<LatLng>({ lat: 13.0827, lng: 80.2707 });
   const [userMode, setUserMode] = useState<'explorer' | 'vendor' | 'history'>('explorer');
   const [explorerTab, setExplorerTab] = useState<'logs' | 'discovery' | 'live_vendors' | 'lens' | 'impact'>('logs');
@@ -540,8 +565,8 @@ export default function App() {
           hours: p.hours,
           youtubeLink: p.youtubeLink,
           reviews: p.reviews || [],
-          safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
-          urbanLogistics: p.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50 },
+          safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
+          urbanLogistics: p.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
           predictedFootfall: p.predictedFootfall || [
             { period: "6am-10am", volume: 30 },
             { period: "11am-2pm", volume: 70 },
@@ -689,8 +714,8 @@ export default function App() {
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
         reviews: profile.reviews || [],
-        safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
-        urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50 },
+        safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
+        urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
         predictedFootfall: profile.predictedFootfall || [
           { period: "6am-10am", volume: 30 },
           { period: "11am-2pm", volume: 70 },
@@ -718,6 +743,7 @@ export default function App() {
 
 const handleShopSelect = async (shop: Shop) => {
   setActiveShop(shop);
+  setLensShopData(shop); // Set persistent data for Lens tab metrics
   currentShopIdRef.current = shop.id; // Lock current audio session
   setLensTargetName(shop.name);
   setLocation(shop.coords);
@@ -912,8 +938,8 @@ const handleShopSelect = async (shop: Shop) => {
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
         reviews: [],
-        safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80 },
-        urbanLogistics: { transitAccessibility: 80, walkabilityScore: 80, parkingAvailability: 80 },
+        safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80, nearestPoliceStations: [] },
+        urbanLogistics: { transitAccessibility: 80, walkabilityScore: 80, parkingAvailability: 80, publicTransportNodes: [] },
         predictedFootfall: [
           { period: "6am-10am", volume: 30 },
           { period: "11am-2pm", volume: 70 },
@@ -1626,37 +1652,63 @@ const handleShopSelect = async (shop: Shop) => {
                             ))}
                           </div>
 
-                          {/* Relocated Safety Intelligence */}
-                          {activeShop?.safetyMetrics && (
+                          {/* Relocated Safety Intelligence with Police Stations - Linked to lensShopData for persistence */}
+                          {lensShopData?.safetyMetrics && (
                             <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
-                              <SafetyRadar metrics={activeShop.safetyMetrics} />
+                              <SafetyRadar metrics={lensShopData.safetyMetrics} />
                               <div className="space-y-3 pt-2">
-                                <SafetyMetricBar label="Crime" value={activeShop.safetyMetrics.crimeSafety} />
-                                <SafetyMetricBar label="Police" value={activeShop.safetyMetrics.policeProximity} />
-                                <SafetyMetricBar label="Lighting" value={activeShop.safetyMetrics.lighting} />
+                                <SafetyMetricBar label="Crime" value={lensShopData.safetyMetrics.crimeSafety} />
+                                <SafetyMetricBar label="Police" value={lensShopData.safetyMetrics.policeProximity} />
+                                <SafetyMetricBar label="Lighting" value={lensShopData.safetyMetrics.lighting} />
                               </div>
+                              {lensShopData.safetyMetrics.nearestPoliceStations && lensShopData.safetyMetrics.nearestPoliceStations.length > 0 && (
+                                <div className="space-y-2 pt-2 border-t border-indigo-500/10">
+                                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Nearest Police Precincts</p>
+                                  <div className="flex flex-col gap-1.5">
+                                    {lensShopData.safetyMetrics.nearestPoliceStations.map((station, i) => (
+                                      <div key={i} className="px-3 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
+                                        <span className="text-[10px]">👮</span>
+                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          {/* Relocated Urban Logistics */}
-                          {activeShop?.urbanLogistics && (
+                          {/* Relocated Urban Logistics with Transit Nodes - Linked to lensShopData for persistence */}
+                          {lensShopData?.urbanLogistics && (
                             <div className="p-6 bg-emerald-600/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
-                              <LogisticsRadar logistics={activeShop.urbanLogistics} />
+                              <LogisticsRadar logistics={lensShopData.urbanLogistics} />
                               <div className="space-y-3 pt-2">
-                                <LogisticsMetricBar label="Transit" value={activeShop.urbanLogistics.transitAccessibility} />
-                                <LogisticsMetricBar label="Walkability" value={activeShop.urbanLogistics.walkabilityScore} />
-                                <LogisticsMetricBar label="Parking" value={activeShop.urbanLogistics.parkingAvailability} />
+                                <LogisticsMetricBar label="Transit" value={lensShopData.urbanLogistics.transitAccessibility} />
+                                <LogisticsMetricBar label="Walkability" value={lensShopData.urbanLogistics.walkabilityScore} />
+                                <LogisticsMetricBar label="Parking" value={lensShopData.urbanLogistics.parkingAvailability} />
                               </div>
+                              {lensShopData.urbanLogistics.publicTransportNodes && lensShopData.urbanLogistics.publicTransportNodes.length > 0 && (
+                                <div className="space-y-2 pt-2 border-t border-emerald-500/10">
+                                  <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
+                                  <div className="flex flex-col gap-1.5">
+                                    {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
+                                      <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/10 flex items-center gap-2">
+                                        <span className="text-[10px]">🚌</span>
+                                        <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
-                          {/* Relocated Traffic Intelligence */}
-                          {activeShop?.predictedFootfall && (
+                          {/* Relocated Traffic Intelligence - Linked to lensShopData for persistence */}
+                          {lensShopData?.predictedFootfall && (
                             <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
-                              <FootfallChart data={activeShop.predictedFootfall} />
+                              <FootfallChart data={lensShopData.predictedFootfall} />
                               <p className="text-[8px] text-rose-300/40 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}

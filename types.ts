@@ -1,4 +1,3 @@
-
 export interface LatLng {
   lat: number;
   lng: number;
@@ -29,13 +28,14 @@ export interface SafetyMetrics {
   footfallIntensity: number;
   lighting: number;
   vibe: number;
+  nearestPoliceStations?: string[];
 }
 
-// Added UrbanLogistics interface to resolve "exported member not found" error in App.tsx
 export interface UrbanLogistics {
   transitAccessibility: number;
   walkabilityScore: number;
   parkingAvailability: number;
+  publicTransportNodes?: string[];
 }
 
 export interface FootfallPoint {
@@ -58,7 +58,6 @@ export interface Shop {
   youtubeLink?: string;
   reviews?: Review[];
   safetyMetrics?: SafetyMetrics;
-  // Added urbanLogistics property to Shop interface
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
 }
@@ -75,7 +74,6 @@ export interface VendorProfile {
   youtubeLink?: string;
   reviews?: Review[];
   safetyMetrics?: SafetyMetrics;
-  // Added urbanLogistics property to VendorProfile interface
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
 }

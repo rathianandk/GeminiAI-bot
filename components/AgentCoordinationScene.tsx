@@ -116,7 +116,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       labelsRef.current.set(agent.name, label);
     });
 
-    // Neural Web Connections
+    // Neural Web Connections (Supervisor Arrows)
     const supervisor = AGENTS.find(a => a.isSupervisor)!;
     AGENTS.forEach(agent => {
       if (agent === supervisor) return;
@@ -124,7 +124,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       const lineMaterial = new THREE.LineBasicMaterial({ 
         color: agent.color, 
         transparent: true, 
-        opacity: 0.1 
+        opacity: 0.4 // Base opacity increased for brightness
       });
       
       const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -178,10 +178,11 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         }
       });
 
-      // Update Invocation Path Lighting
+      // Update Invocation Path Lighting (Brighter Arrows)
       supervisorLinesRef.current.forEach((line, name) => {
         const isBeingInvoked = name === activeAgentRef.current;
-        const targetOpacity = isBeingInvoked ? 0.8 + Math.sin(Date.now() * 0.02) * 0.2 : 0.1;
+        // targetOpacity increased: Active is 1.0, Idle is 0.35
+        const targetOpacity = isBeingInvoked ? 1.0 : 0.35;
         const targetColor = isBeingInvoked ? 0xffffff : AGENTS.find(a => a.name === name)?.color || 0x6366f1;
 
         if (line.material instanceof THREE.LineBasicMaterial) {

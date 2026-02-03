@@ -36,7 +36,6 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
 };
 
 export const discoveryAgent = async (query: string, location: LatLng) => {
-  // We use gemini-2.5-flash as per rules for Google Maps grounding support.
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of (${location.lat}, ${location.lng}). 
@@ -44,8 +43,9 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     INSTRUCTIONS:
     1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
     2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. SAFETY ANALYSIS: Reason about local safety metrics.
-    4. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
+    3. SAFETY ANALYSIS: Reason about local safety metrics and identify exactly the top 3 nearest police station names.
+    4. URBAN LOGISTICS: Reason about Public Transit, Walkability, and Parking. Identify exactly the top 3 nearest public transport nodes (Bus stops, Metro stations, Railway).
+    5. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
     
     REQUIRED JSON STRUCTURE:
     {
@@ -63,7 +63,14 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
             "policeProximity": 70, 
             "footfallIntensity": 90, 
             "lighting": 80, 
-            "vibe": 95
+            "vibe": 95,
+            "nearestPoliceStations": ["Station Name 1", "Station Name 2"]
+          },
+          "urbanLogistics": {
+            "transitAccessibility": 90,
+            "walkabilityScore": 85,
+            "parkingAvailability": 40,
+            "publicTransportNodes": ["Bus Stop A", "Metro Station B"]
           },
           "predictedFootfall": [
             {"period": "6am-10am", "volume": 40},
@@ -125,7 +132,8 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
     isVendor: false,
     reviews: [],
-    safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
+    safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
+    urbanLogistics: s.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
     predictedFootfall: s.predictedFootfall || [
       { period: "6am-10am", volume: 30 },
       { period: "11am-2pm", volume: 70 },
