@@ -43,6 +43,13 @@ export interface FootfallPoint {
   volume: number;
 }
 
+export interface SuccessReasoning {
+  locationGravity: number;
+  flavorMoat: number;
+  socialResonance: number;
+  economicFit: number;
+}
+
 export interface Shop {
   id: string;
   name: string;
@@ -60,6 +67,8 @@ export interface Shop {
   safetyMetrics?: SafetyMetrics;
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
+  successReasoning?: SuccessReasoning;
+  // Added hygieneScore to support vendor node reporting
   hygieneScore?: number;
 }
 
@@ -77,6 +86,8 @@ export interface VendorProfile {
   safetyMetrics?: SafetyMetrics;
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
+  successReasoning?: SuccessReasoning;
+  // Added hygieneScore to support management of partner nodes
   hygieneScore?: number;
 }
 
@@ -140,7 +151,6 @@ export interface SpatialAnalytics {
   legendaryIndex: { name: string; score: number; reasoning: string }[];
   customerSegmentation: { segment: string; description: string; volume: number }[];
   sectorSummary: string;
-  hygieneDistribution?: { range: string; count: number }[];
 }
 
 export interface FlavorEra {

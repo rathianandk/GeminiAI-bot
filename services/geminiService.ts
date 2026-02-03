@@ -43,11 +43,13 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     INSTRUCTIONS:
     1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
     2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. SPATIAL HYGIENE INDEX (hygieneScore): Strictly calculate this score (0-100) based on the "Infrastructure and Environmental status". 
-       - Infrastructure: Waste management proximity, pavement drainage, and lighting.
-       - Environmental: Traffic air-stress, noise levels, and shade availability.
+    3. SUCCESS REASONING (successReasoning): Reason about the node's survivability and success based on spatial telemetry.
+       - locationGravity: Score (0-100) based on transit flow and natural urban gravity.
+       - flavorMoat: Score (0-100) based on the uniqueness and irreplacability of the dish/vibe.
+       - socialResonance: Score (0-100) based on social proof, hype velocity, and local legend status.
+       - economicFit: Score (0-100) based on neighborhood demographics vs price points.
     4. SAFETY ANALYSIS: Reason about local safety metrics and identify exactly the top 3 nearest police station names.
-    5. URBAN LOGISTICS: Reason about Public Transit, Walkability, and Parking. Identify exactly the top 3 nearest public transport nodes (Bus stops, Metro stations, Railway).
+    5. URBAN LOGISTICS: Reason about Public Transit, Walkability, and Parking. Identify exactly the top 3 nearest public transport nodes.
     6. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
     
     REQUIRED JSON STRUCTURE:
@@ -61,7 +63,12 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
           "cuisine": "Type", 
           "description": "Story", 
           "address": "Address",
-          "hygieneScore": 88,
+          "successReasoning": {
+            "locationGravity": 85,
+            "flavorMoat": 90,
+            "socialResonance": 75,
+            "economicFit": 80
+          },
           "safetyMetrics": {
             "crimeSafety": 85, 
             "policeProximity": 70, 
@@ -136,7 +143,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
     isVendor: false,
     reviews: [],
-    hygieneScore: s.hygieneScore || (Math.floor(Math.random() * 30) + 65), // Fallback if not provided
+    successReasoning: s.successReasoning || { locationGravity: 70, flavorMoat: 70, socialResonance: 70, economicFit: 70 },
     safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
     urbanLogistics: s.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
     predictedFootfall: s.predictedFootfall || [

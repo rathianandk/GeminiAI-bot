@@ -35,7 +35,8 @@ import {
   Review,
   SafetyMetrics,
   UrbanLogistics,
-  FootfallPoint
+  FootfallPoint,
+  SuccessReasoning
 } from './types';
 
 // Register Chart.js components
@@ -52,7 +53,7 @@ const SEED_SHOPS: Shop[] = [
     description: 'Legendary window-service spot in Mylapore.', 
     address: 'Mylapore, Chennai', 
     reviews: [], 
-    hygieneScore: 82,
+    successReasoning: { locationGravity: 92, flavorMoat: 95, socialResonance: 88, economicFit: 85 },
     safetyMetrics: { 
       crimeSafety: 92, 
       policeProximity: 65, 
@@ -85,7 +86,7 @@ const SEED_SHOPS: Shop[] = [
     description: 'The most iconic Rose Milk in the city.', 
     address: 'South Mada St, Chennai', 
     reviews: [], 
-    hygieneScore: 94,
+    successReasoning: { locationGravity: 85, flavorMoat: 98, socialResonance: 90, economicFit: 78 },
     safetyMetrics: { 
       crimeSafety: 95, 
       policeProximity: 85, 
@@ -121,7 +122,7 @@ const SEED_PROFILES: VendorProfile[] = [
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00',
     reviews: [],
-    hygieneScore: 78,
+    successReasoning: { locationGravity: 88, flavorMoat: 94, socialResonance: 96, economicFit: 82 },
     safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85, nearestPoliceStations: ["Triplicane Police Station"] },
     urbanLogistics: { transitAccessibility: 85, walkabilityScore: 70, parkingAvailability: 45, publicTransportNodes: ["Triplicane High Road Bus Stop", "Government Estate Metro"] },
     predictedFootfall: [
@@ -146,26 +147,24 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
 
     if (chartRef.current) chartRef.current.destroy();
 
-    // Data aggregation for "Success Reasoning"
-    const sanitation = shop.hygieneScore || 0;
-    const safety = shop.safetyMetrics ? 
-      (shop.safetyMetrics.crimeSafety + shop.safetyMetrics.vibe + shop.safetyMetrics.lighting) / 3 : 0;
-    const logistics = shop.urbanLogistics ? 
-      (shop.urbanLogistics.transitAccessibility + shop.urbanLogistics.walkabilityScore + shop.urbanLogistics.parkingAvailability) / 3 : 0;
-    const vitality = shop.predictedFootfall ? 
-      shop.predictedFootfall.reduce((acc, curr) => acc + curr.volume, 0) / shop.predictedFootfall.length : 0;
+    const reasoning = shop.successReasoning || {
+      locationGravity: 75,
+      flavorMoat: 75,
+      socialResonance: 75,
+      economicFit: 75
+    };
 
     chartRef.current = new Chart(ctx, {
       type: 'polarArea',
       data: {
-        labels: ['Sanitation', 'Safety', 'Logistics', 'Vitality'],
+        labels: ['Location Gravity', 'Flavor Moat', 'Social Resonance', 'Economic Fit'],
         datasets: [{
-          data: [sanitation, safety, logistics, vitality],
+          data: [reasoning.locationGravity, reasoning.flavorMoat, reasoning.socialResonance, reasoning.economicFit],
           backgroundColor: [
-            'rgba(16, 185, 129, 0.85)', // Emerald
             'rgba(99, 102, 241, 0.85)', // Indigo
-            'rgba(245, 158, 11, 0.85)', // Amber
-            'rgba(244, 63, 94, 0.85)'   // Rose
+            'rgba(16, 185, 129, 0.85)', // Emerald
+            'rgba(244, 63, 94, 0.85)',  // Rose
+            'rgba(245, 158, 11, 0.85)'   // Amber
           ],
           borderColor: '#ffffff',
           borderWidth: 1.5,
@@ -192,10 +191,10 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
   }, [shop]);
 
   const logicPoints = [
-    { label: 'Sanitation', outcome: 'Trust Focus', icon: '✨', color: 'text-emerald-400' },
-    { label: 'Safety', outcome: 'Stay Duration', icon: '🛡️', color: 'text-indigo-400' },
-    { label: 'Logistics', outcome: 'Grid Access', icon: '🚛', color: 'text-amber-400' },
-    { label: 'Vitality', outcome: 'Node Density', icon: '📈', color: 'text-rose-400' }
+    { label: 'Location Gravity', outcome: 'Flow Pull', icon: '🌍', color: 'text-indigo-400' },
+    { label: 'Flavor Moat', outcome: 'Defensibility', icon: '🏰', color: 'text-emerald-400' },
+    { label: 'Social Resonance', outcome: 'Hype Velocity', icon: '📢', color: 'text-rose-400' },
+    { label: 'Economic Fit', outcome: 'Margin Safety', icon: '💎', color: 'text-amber-400' }
   ];
 
   return (
@@ -217,111 +216,6 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
       </div>
     </div>
   );
-};
-
-// --- Hygiene Gauge Component ---
-const HygieneGauge = ({ score }: { score: number }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<Chart | null>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    if (chartRef.current) chartRef.current.destroy();
-
-    const color = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#f43f5e';
-
-    chartRef.current = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        datasets: [{
-          data: [score, 100 - score],
-          backgroundColor: [color, 'rgba(255, 255, 255, 0.05)'],
-          borderWidth: 0,
-          circumference: 240,
-          rotation: 240,
-          cutout: '85%',
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: false }
-        }
-      }
-    });
-
-    return () => chartRef.current?.destroy();
-  }, [score]);
-
-  return (
-    <div className="relative w-24 h-24">
-      <canvas ref={canvasRef} />
-      <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
-        <span className="text-[14px] font-black text-white">{score}%</span>
-        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest text-center">S-Sanitation</span>
-      </div>
-    </div>
-  );
-};
-
-// --- Regional Hygiene Chart Component ---
-const RegionalHygieneChart = ({ shops }: { shops: Shop[] }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<Chart | null>(null);
-
-  useEffect(() => {
-    if (!canvasRef.current || shops.length === 0) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    if (chartRef.current) chartRef.current.destroy();
-
-    const sortedShops = [...shops].sort((a, b) => (b.hygieneScore || 0) - (a.hygieneScore || 0)).slice(0, 6);
-    const labels = sortedShops.map(s => s.name);
-    const data = sortedShops.map(s => s.hygieneScore || 0);
-
-    chartRef.current = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Spatial Sanitation Index',
-          data: data,
-          backgroundColor: 'rgba(16, 185, 129, 0.5)',
-          borderColor: '#10b981',
-          borderWidth: 1,
-          borderRadius: 5,
-        }]
-      },
-      options: {
-        indexAxis: 'y',
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { color: 'rgba(255, 255, 255, 0.5)', font: { size: 8 } }
-          },
-          y: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 9, family: 'monospace', weight: 'bold' } }
-          }
-        },
-        plugins: {
-          legend: { display: false }
-        },
-        responsive: true,
-        maintainAspectRatio: false
-      }
-    });
-
-    return () => chartRef.current?.destroy();
-  }, [shops]);
-
-  return <div className="w-full h-48 relative"><canvas ref={canvasRef} /></div>;
 };
 
 // --- Radar Chart Component ---
@@ -761,6 +655,7 @@ export default function App() {
           youtubeLink: p.youtubeLink,
           reviews: p.reviews || [],
           hygieneScore: p.hygieneScore || 85,
+          successReasoning: p.successReasoning || { locationGravity: 80, flavorMoat: 80, socialResonance: 80, economicFit: 80 },
           safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
           urbanLogistics: p.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
           predictedFootfall: p.predictedFootfall || [
@@ -910,7 +805,7 @@ export default function App() {
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
         reviews: profile.reviews || [],
-        hygieneScore: profile.hygieneScore || 85,
+        successReasoning: profile.successReasoning || { locationGravity: 80, flavorMoat: 80, socialResonance: 80, economicFit: 80 },
         safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
         urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
         predictedFootfall: profile.predictedFootfall || [
@@ -1138,6 +1033,7 @@ const handleShopSelect = async (shop: Shop) => {
         youtubeLink: regForm.youtubeLink,
         reviews: [],
         hygieneScore: regForm.hygieneScore,
+        successReasoning: { locationGravity: 80, flavorMoat: 80, socialResonance: 80, economicFit: 80 },
         safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80, nearestPoliceStations: [] },
         urbanLogistics: { transitAccessibility: 80, walkabilityScore: 80, parkingAvailability: 80, publicTransportNodes: [] },
         predictedFootfall: [
@@ -1747,14 +1643,6 @@ const handleShopSelect = async (shop: Shop) => {
                                   </div>
 
                                   <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">S-Sanitation Index (Infra + Env)</p>
-                                    <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4 shadow-inner">
-                                       <RegionalHygieneChart shops={discoveredShops} />
-                                       <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-widest">Regional Stress-Weighted Health Spectrum</p>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
                                       {analytics.priceSpectrum.map((p, i) => (
@@ -2194,7 +2082,8 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32 items-center md:items-start">
                 <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center shrink-0">
                    <span>{activeShop.emoji}</span>
-                </div>       
+                </div>
+                
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0 w-full">
                     <span className="text-amber-500 text-sm">⭐</span>
