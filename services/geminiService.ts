@@ -42,14 +42,29 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of (${location.lat}, ${location.lng}). 
     
     INSTRUCTIONS:
-    1. Scan Google Maps and Search for authentic food nodes.
+    1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
     2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. You MUST format the results into a valid JSON object.
+    3. SAFETY ANALYSIS: Reason about local safety metrics based on neighborhood crime history, proximity to police stations, and predictive footfall patterns. 
     
     REQUIRED JSON STRUCTURE:
     {
       "shops": [
-        { "id": "sync-unique-1", "name": "Name", "coords": {"lat": 13.0, "lng": 80.0}, "emoji": "🥘", "cuisine": "Type", "description": "Story", "address": "Address" }
+        { 
+          "id": "sync-unique-1", 
+          "name": "Name", 
+          "coords": {"lat": 13.0, "lng": 80.0}, 
+          "emoji": "🥘", 
+          "cuisine": "Type", 
+          "description": "Story", 
+          "address": "Address",
+          "safetyMetrics": {
+            "crimeSafety": 85, 
+            "policeProximity": 70, 
+            "footfallIntensity": 90, 
+            "lighting": 80, 
+            "vibe": 95
+          }
+        }
       ],
       "logs": [
         "Internal step 1 summary...",
@@ -57,7 +72,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
       ]
     }
     
-    CRITICAL: Output ONLY the raw JSON object. Do not include markdown formatting or conversational filler.`,
+    CRITICAL: Values for safetyMetrics must be integers (0-100) where higher is safer/better. Output ONLY the raw JSON object. Do not include markdown formatting or conversational filler.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -79,7 +94,6 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   }
 
   try {
-    // Advanced Extraction: Find the outermost JSON object even if wrapped in markdown
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       data = JSON.parse(jsonMatch[0]);
@@ -102,7 +116,8 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     ...s,
     id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
     isVendor: false,
-    reviews: []
+    reviews: [],
+    safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
   }));
 
   const resultLogs = (data.logs && data.logs.length > 0) ? data.logs : ["Grid scan successful. Visualizing nodes."];
@@ -157,14 +172,13 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
   const text = response.text || "";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   
-  // Clean narrative by removing headers, labels, and backticks
   const narrative = text
-    .replace(/\{[\s\S]*\}/, "") // Remove the JSON block
-    .replace(/PART\s*[AB]/gi, "") // Remove "PART A" or "PART B"
-    .replace(/\(?Narrative\)?[:\-]?/gi, "") // Remove "(Narrative):"
-    .replace(/\(?JSON\)?[:\-]?/gi, "") // Remove "(JSON):"
-    .replace(/```[a-z]*/gi, "") // Remove opening backticks
-    .replace(/```/gi, "") // Remove closing backticks
+    .replace(/\{[\s\S]*\}/, "") 
+    .replace(/PART\s*[AB]/gi, "") 
+    .replace(/\(?Narrative\)?[:\-]?/gi, "") 
+    .replace(/\(?JSON\)?[:\-]?/gi, "") 
+    .replace(/```[a-z]*/gi, "") 
+    .replace(/```/gi, "") 
     .trim();
 
   if (jsonMatch) {
@@ -465,7 +479,7 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Say excitedly: ${textResponse.text}` }] }],
     config: {
-      responseModalalities: [Modality.AUDIO],
+      responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } }
     }
   });

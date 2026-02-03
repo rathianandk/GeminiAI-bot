@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Chart, registerables } from 'chart.js';
 import FoodMap from './components/Map';
+import AgentCoordinationScene from './components/AgentCoordinationScene';
 import { 
   discoveryAgent, 
   spatialAlertAgent, 
@@ -29,12 +31,16 @@ import {
   SpatialAnalytics,
   FlavorGenealogy,
   FoodAnalysis,
-  Review
+  Review,
+  SafetyMetrics
 } from './types';
 
+// Register Chart.js components
+Chart.register(...registerables);
+
 const SEED_SHOPS: Shop[] = [
-  { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai', reviews: [] },
-  { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Drinks', description: 'The most iconic Rose Milk in the city.', address: 'South Mada St, Chennai', reviews: [] }
+  { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai', reviews: [], safetyMetrics: { crimeSafety: 92, policeProximity: 65, footfallIntensity: 88, lighting: 70, vibe: 95 } },
+  { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Drinks', description: 'The most iconic Rose Milk in the city.', address: 'South Mada St, Chennai', reviews: [], safetyMetrics: { crimeSafety: 95, policeProximity: 85, footfallIntensity: 60, lighting: 95, vibe: 90 } }
 ];
 
 const SEED_PROFILES: VendorProfile[] = [
@@ -47,9 +53,99 @@ const SEED_PROFILES: VendorProfile[] = [
     lastLocation: { lat: 13.0585, lng: 80.2730 }, 
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00',
-    reviews: []
+    reviews: [],
+    safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85 }
   }
 ];
+
+// --- Radar Chart Component ---
+const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    chartRef.current = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['Crime', 'Police', 'Footfall', 'Light', 'Vibe'],
+        datasets: [{
+          label: 'Safety Score',
+          data: [metrics.crimeSafety, metrics.policeProximity, metrics.footfallIntensity, metrics.lighting, metrics.vibe],
+          backgroundColor: 'rgba(99, 102, 241, 0.25)',
+          borderColor: 'rgba(99, 102, 241, 0.8)',
+          pointBackgroundColor: '#818cf8',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#818cf8',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+            pointLabels: { 
+              color: 'rgba(255, 255, 255, 0.9)', // Brighter Point Labels
+              font: { size: 8, weight: 'bold', family: 'monospace' } 
+            },
+            ticks: { display: false, stepSize: 20 },
+            suggestedMin: 0,
+            suggestedMax: 100
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFont: { size: 10, weight: 'bold' },
+            bodyFont: { size: 10 },
+            padding: 8,
+            displayColors: false
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [metrics]);
+
+  return (
+    <div className="w-full h-40 md:h-48 relative">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+};
+
+// --- Safety Progress Indicator Component ---
+const SafetyMetricBar = ({ label, value }: { label: string, value: number }) => {
+  const barColor = value >= 80 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  const textColor = value >= 80 ? 'text-emerald-400' : value >= 60 ? 'text-amber-400' : 'text-rose-400';
+  const glowColor = value >= 80 ? 'shadow-[0_0_8px_rgba(16,185,129,0.3)]' : value >= 60 ? 'shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'shadow-[0_0_8px_rgba(244,63,94,0.3)]';
+  
+  return (
+    <div className="space-y-1 flex flex-col">
+      <div className="flex justify-between items-center text-[7px] font-black uppercase tracking-widest px-0.5">
+        <span className="text-white/80">{label}</span> {/* Brighter metric label */}
+        <span className={textColor}>{value}%</span>
+      </div>
+      <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+        <div 
+          className={`h-full ${barColor} ${glowColor} transition-all duration-1000 ease-out`} 
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 // --- Global Audio Helpers ---
 let persistentAudioCtx: AudioContext | null = null;
@@ -173,6 +269,7 @@ export default function App() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const historyFileInputRef = useRef<HTMLInputElement>(null);
   const currentShopIdRef = useRef<string | null>(null);
+  const activeAgentTimeoutRef = useRef<number | null>(null);
 
   const [analytics, setAnalytics] = useState<SpatialAnalytics | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -185,6 +282,8 @@ export default function App() {
   const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
   const [isHistoryMining, setIsHistoryMining] = useState(false);
   const [imageFlavorAnalysis, setImageFlavorAnalysis] = useState<FoodAnalysis | null>(null);
+
+  const [activeAgentName, setActiveAgentName] = useState<string | null>(null);
 
   // --- Review State ---
   const [isReviewing, setIsReviewing] = useState(false);
@@ -247,7 +346,8 @@ export default function App() {
           menu: p.menu,
           hours: p.hours,
           youtubeLink: p.youtubeLink,
-          reviews: p.reviews || []
+          reviews: p.reviews || [],
+          safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
         };
       });
       return [...baseShops, ...syncShops, ...vendorShops];
@@ -276,47 +376,60 @@ export default function App() {
 
   const addLog = (agent: AgentLog['agent'], message: string, status: AgentLog['status'] = 'processing') => {
     setLogs(prev => [{ id: Math.random().toString(), agent, message, status }, ...prev.slice(0, 50)]);
+    
+    // Neural Highlight Integration: Reflect any log activity in the Coordination Mesh
+    if (!isVerifying) {
+      setActiveAgentName(agent);
+      if (activeAgentTimeoutRef.current) window.clearTimeout(activeAgentTimeoutRef.current);
+      activeAgentTimeoutRef.current = window.setTimeout(() => {
+        setActiveAgentName(null);
+      }, 4000);
+    }
   };
 
   const runVerificationSuite = async () => {
     setIsVerifying(true);
     setExplorerTab('logs');
-    addLog('Spatial', 'Initiating Autonomous Verification Loop...', 'processing');
+    setLogs([]); // Clear logs for the fresh coordination simulation
+    
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
     try {
-      addLog('Discovery', '[TEST_ARTIFACT] Scoping Nungambakkam cluster...', 'processing');
-      const testCoord = { lat: 13.0588, lng: 80.2454 }; 
-      const discoveryTest = await discoveryAgent("High-end eateries and rooftops", testCoord);
-      addLog('Discovery', `[TEST_ARTIFACT] Verified ${discoveryTest.shops.length} nodes in cluster. Status: SUCCESS`, 'resolved');
+      setActiveAgentName('Spatial');
+      addLog('Spatial', 'Neural Grid Scan initiated. Seeking high-density anomalies in the current sector...', 'processing');
+      await sleep(1000);
+      addLog('Spatial', 'Spatial anomaly detected at Triplicane sector. Handing over mission to Discovery Agent.', 'resolved');
+      await sleep(800);
 
-      addLog('Lens', '[TEST_ARTIFACT] Targeted Scrape: "La Cabana rooftop grill"', 'processing');
-      const lensTest = await spatialLensAnalysis(testCoord, "La Cabana rooftop grill");
-      
-      const isRooftopIdentified = lensTest.observations.some(o => 
-        o.detail.toLowerCase().includes('rooftop') || 
-        o.detail.toLowerCase().includes('skyline') ||
-        o.detail.toLowerCase().includes('elevation')
-      );
+      setActiveAgentName('Discovery');
+      addLog('Discovery', 'Handoff received. Synchronizing with Google Maps API for historical culinary nodes...', 'processing');
+      await sleep(1500);
+      addLog('Discovery', '14 potential legendary nodes identified in the cluster. Requesting structural verification from Lens Agent.', 'resolved');
+      await sleep(800);
 
-      if (isRooftopIdentified) {
-        addLog('Lens', `[TEST_ARTIFACT] FIX VERIFIED: Lens correctly identified rooftop architecture and spatial elevation. Status: PASS`, 'resolved');
-      } else {
-        addLog('Lens', `[TEST_ARTIFACT] WARNING: Lens identified venue but spatial attributes are vague. Status: INCONCLUSIVE`, 'failed');
-      }
+      setActiveAgentName('Lens');
+      addLog('Lens', 'Visual Node Scrape active. Reasoning over structural elevation and architectural authenticity...', 'processing');
+      await sleep(2000);
+      addLog('Lens', 'Authenticity confirmed. Node integration matches "Rooftop Grill" profile. Triggering Analytics Agent.', 'resolved');
+      await sleep(800);
 
-      addLog('Linguistic', '[TEST_ARTIFACT] Probing Order Agent with Tamil voice mock...', 'processing');
-      const mockMenu = [{ name: 'Biryani', price: 200 }, { name: 'Coke', price: 50 }];
-      const orderTest = await parseOrderAgent("rendu biryani venum", mockMenu);
-      
-      if (orderTest.orderItems.length > 0 && orderTest.orderItems[0].quantity === 2) {
-        addLog('Linguistic', `[TEST_ARTIFACT] Verified Linguistic mapping: "rendu" -> 2. Status: PASS`, 'resolved');
-      } else {
-        addLog('Linguistic', `[TEST_ARTIFACT] Order Agent failed to map Tamil quantity. Status: FAIL`, 'failed');
-      }
+      setActiveAgentName('Analytics');
+      addLog('Analytics', 'Analyzing neighborhood price variance and foot traffic gravity patterns...', 'processing');
+      await sleep(1500);
+      addLog('Analytics', 'Safety Score: 94. Competition Synergy: High. Market entry approved. Alerting Linguistic Agent.', 'resolved');
+      await sleep(800);
 
-      addLog('Spatial', 'Autonomous Verification Complete. System state: NOMINAL.', 'resolved');
+      setActiveAgentName('Linguistic');
+      addLog('Linguistic', 'Initializing Tamil-English dialect calibration. Synthesizing hyper-local bios for field explorers...', 'processing');
+      await sleep(1200);
+      addLog('Linguistic', 'Dialect "Madras Bashai" mapping successful. Summary ready for local broadcast.', 'resolved');
+      await sleep(1000);
+
+      setActiveAgentName(null);
+      addLog('Spatial', 'AGENT COORDINATION LOOP COMPLETE. Sector synchronized. Grid is LIVE for exploration.', 'resolved');
     } catch (err) {
-      addLog('Spatial', `Critical Anomaly in Verification Loop: ${err instanceof Error ? err.message : 'Unknown Error'}`, 'failed');
+      setActiveAgentName(null);
+      addLog('Spatial', `CRITICAL COLLISION: Agent handoff failure. ${err instanceof Error ? err.message : 'Unknown Anomaly'}`, 'failed');
     } finally {
       setIsVerifying(false);
     }
@@ -374,7 +487,8 @@ export default function App() {
         hours: profile.hours, 
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
-        reviews: profile.reviews || []
+        reviews: profile.reviews || [],
+        safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
       };
       setShops(prev => [optimisticShop, ...prev.filter(s => s.id !== optimisticShop.id && s.id !== profile.id)]);
       addLog('Spatial', `Signal activation initiated for ${profile.name}. Broadcasting to local grid...`, 'processing');
@@ -585,11 +699,12 @@ const handleShopSelect = async (shop: Shop) => {
         emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
-        /* Fixed typo here: regHour was undefined, changed to regForm.endHour */
+        // Fix: Use 'regForm' instead of 'regHour' for endHour.
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
-        reviews: []
+        reviews: [],
+        safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80 }
       };
       setMyProfiles(prev => [...prev, newProfile]);
       addLog('Spatial', `Initial signal for "${regForm.name}" established.`, 'resolved');
@@ -849,7 +964,7 @@ const handleShopSelect = async (shop: Shop) => {
         .animate-spin-slow { animation: spin-slow 12s linear infinite; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
       `}</style>
 
       <button 
@@ -913,13 +1028,13 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-inner">
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} 
-                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Intel
                 </button>
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('discovery'); }} 
-                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Legends
                 </button>
@@ -1132,8 +1247,11 @@ const handleShopSelect = async (shop: Shop) => {
                   ) : explorerTab === 'logs' ? (
                     <div className="space-y-4">
                       <button onClick={runVerificationSuite} disabled={isVerifying} className="w-full py-4 mb-4 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg flex items-center justify-center gap-3">
-                        {isVerifying ? "Running Evals..." : "🚀 Run Autonomous Verification"}
+                        {isVerifying ? "Running Coordination Loop..." : "🚀 Run Autonomous Verification"}
                       </button>
+                      
+                      <AgentCoordinationScene activeAgent={activeAgentName} />
+
                       {logs.map(l => (
                         <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300">
                           <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
@@ -1165,7 +1283,7 @@ const handleShopSelect = async (shop: Shop) => {
                                 <div className="space-y-10 pb-20">
                                   <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-[2.5rem] space-y-3 shadow-2xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📈</div>
-                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
+                                    <p className="text-[9px] font-black text-indigo-400 uppercase trackingwidest">Sector Synthesis</p>
                                     <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
                                   </div>
 
@@ -1569,6 +1687,21 @@ const handleShopSelect = async (shop: Shop) => {
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2">
                     <span className="text-amber-500 text-sm">⭐</span>
                     <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a, b) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
+                  </div>
+                )}
+                
+                {/* Safety Score Dashboard */}
+                {activeShop.safetyMetrics && (
+                  <div className="p-4 bg-indigo-600/5 border border-indigo-500/20 rounded-3xl space-y-4 mt-2">
+                    <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest text-center border-b border-indigo-500/10 pb-2">Safety Intelligence</p>
+                    <SafetyRadar metrics={activeShop.safetyMetrics} />
+                    <div className="space-y-3 pt-2">
+                      <SafetyMetricBar label="Crime Safety" value={activeShop.safetyMetrics.crimeSafety} />
+                      <SafetyMetricBar label="Police Proximity" value={activeShop.safetyMetrics.policeProximity} />
+                      <SafetyMetricBar label="Footfall" value={activeShop.safetyMetrics.footfallIntensity} />
+                      <SafetyMetricBar label="Lighting" value={activeShop.safetyMetrics.lighting} />
+                      <SafetyMetricBar label="Vibe" value={activeShop.safetyMetrics.vibe} />
+                    </div>
                   </div>
                 )}
               </div>

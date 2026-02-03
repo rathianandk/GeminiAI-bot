@@ -22,6 +22,14 @@ export interface MenuItem {
   isSoldOut?: boolean;
 }
 
+export interface SafetyMetrics {
+  crimeSafety: number;
+  policeProximity: number;
+  footfallIntensity: number;
+  lighting: number;
+  vibe: number;
+}
+
 export interface Shop {
   id: string;
   name: string;
@@ -36,6 +44,7 @@ export interface Shop {
   hours?: string;
   youtubeLink?: string;
   reviews?: Review[];
+  safetyMetrics?: SafetyMetrics;
 }
 
 export interface VendorProfile {
@@ -49,6 +58,7 @@ export interface VendorProfile {
   hours: string;
   youtubeLink?: string;
   reviews?: Review[];
+  safetyMetrics?: SafetyMetrics;
 }
 
 export interface AgentLog {
