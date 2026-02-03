@@ -2194,15 +2194,7 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32 items-center md:items-start">
                 <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center shrink-0">
                    <span>{activeShop.emoji}</span>
-                </div>
-                
-                <div className="mt-2 group relative">
-                   <HygieneGauge score={activeShop.hygieneScore || 85} />
-                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-lg text-[7px] font-black text-white/60 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10 pointer-events-none z-30">
-                     Infra + Env Sanitation Health
-                   </div>
-                </div>
-
+                </div>       
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0 w-full">
                     <span className="text-amber-500 text-sm">⭐</span>
