@@ -32,15 +32,55 @@ import {
   FlavorGenealogy,
   FoodAnalysis,
   Review,
-  SafetyMetrics
+  SafetyMetrics,
+  UrbanLogistics,
+  FootfallPoint
 } from './types';
 
 // Register Chart.js components
 Chart.register(...registerables);
 
 const SEED_SHOPS: Shop[] = [
-  { id: 'seed-1', name: 'Jannal Kadai', coords: { lat: 13.0336, lng: 80.2697 }, isVendor: false, emoji: '🥘', cuisine: 'Bajjis', description: 'Legendary window-service spot in Mylapore.', address: 'Mylapore, Chennai', reviews: [], safetyMetrics: { crimeSafety: 92, policeProximity: 65, footfallIntensity: 88, lighting: 70, vibe: 95 } },
-  { id: 'seed-2', name: 'Kalathi Rose Milk', coords: { lat: 13.0333, lng: 80.2685 }, isVendor: false, emoji: '🥤', cuisine: 'Drinks', description: 'The most iconic Rose Milk in the city.', address: 'South Mada St, Chennai', reviews: [], safetyMetrics: { crimeSafety: 95, policeProximity: 85, footfallIntensity: 60, lighting: 95, vibe: 90 } }
+  { 
+    id: 'seed-1', 
+    name: 'Jannal Kadai', 
+    coords: { lat: 13.0336, lng: 80.2697 }, 
+    isVendor: false, 
+    emoji: '🥘', 
+    cuisine: 'Bajjis', 
+    description: 'Legendary window-service spot in Mylapore.', 
+    address: 'Mylapore, Chennai', 
+    reviews: [], 
+    safetyMetrics: { crimeSafety: 92, policeProximity: 65, footfallIntensity: 88, lighting: 70, vibe: 95 },
+    urbanLogistics: { transitAccessibility: 75, walkabilityScore: 90, parkingAvailability: 30 },
+    predictedFootfall: [
+      { period: "6am-10am", volume: 20 },
+      { period: "11am-2pm", volume: 45 },
+      { period: "3pm-6pm", volume: 95 },
+      { period: "7pm-10pm", volume: 80 },
+      { period: "11pm-2am", volume: 10 }
+    ]
+  },
+  { 
+    id: 'seed-2', 
+    name: 'Kalathi Rose Milk', 
+    coords: { lat: 13.0333, lng: 80.2685 }, 
+    isVendor: false, 
+    emoji: '🥤', 
+    cuisine: 'Drinks', 
+    description: 'The most iconic Rose Milk in the city.', 
+    address: 'South Mada St, Chennai', 
+    reviews: [], 
+    safetyMetrics: { crimeSafety: 95, policeProximity: 85, footfallIntensity: 60, lighting: 95, vibe: 90 },
+    urbanLogistics: { transitAccessibility: 80, walkabilityScore: 95, parkingAvailability: 20 },
+    predictedFootfall: [
+      { period: "6am-10am", volume: 10 },
+      { period: "11am-2pm", volume: 60 },
+      { period: "3pm-6pm", volume: 90 },
+      { period: "7pm-10pm", volume: 75 },
+      { period: "11pm-2am", volume: 5 }
+    ]
+  }
 ];
 
 const SEED_PROFILES: VendorProfile[] = [
@@ -54,7 +94,15 @@ const SEED_PROFILES: VendorProfile[] = [
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00',
     reviews: [],
-    safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85 }
+    safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85 },
+    urbanLogistics: { transitAccessibility: 85, walkabilityScore: 70, parkingAvailability: 45 },
+    predictedFootfall: [
+      { period: "6am-10am", volume: 5 },
+      { period: "11am-2pm", volume: 80 },
+      { period: "3pm-6pm", volume: 40 },
+      { period: "7pm-10pm", volume: 100 },
+      { period: "11pm-2am", volume: 60 }
+    ]
   }
 ];
 
@@ -92,7 +140,7 @@ const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
             angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
             grid: { color: 'rgba(255, 255, 255, 0.1)' },
             pointLabels: { 
-              color: 'rgba(255, 255, 255, 0.9)', // Brighter Point Labels
+              color: 'rgba(255, 255, 255, 0.9)', 
               font: { size: 8, weight: 'bold', family: 'monospace' } 
             },
             ticks: { display: false, stepSize: 20 },
@@ -125,26 +173,171 @@ const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
   );
 };
 
-// --- Safety Progress Indicator Component ---
-const SafetyMetricBar = ({ label, value }: { label: string, value: number }) => {
-  const barColor = value >= 80 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
-  const textColor = value >= 80 ? 'text-emerald-400' : value >= 60 ? 'text-amber-400' : 'text-rose-400';
-  const glowColor = value >= 80 ? 'shadow-[0_0_8px_rgba(16,185,129,0.3)]' : value >= 60 ? 'shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'shadow-[0_0_8px_rgba(244,63,94,0.3)]';
-  
+// --- Logistics Radar Component ---
+const LogisticsRadar = ({ logistics }: { logistics: UrbanLogistics }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    chartRef.current = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['Transit', 'Walkability', 'Parking'],
+        datasets: [{
+          label: 'Logistics Score',
+          data: [logistics.transitAccessibility, logistics.walkabilityScore, logistics.parkingAvailability],
+          backgroundColor: 'rgba(16, 185, 129, 0.25)',
+          borderColor: 'rgba(16, 185, 129, 0.8)',
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#10b981',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+            pointLabels: { 
+              color: 'rgba(16, 185, 129, 0.9)', 
+              font: { size: 8, weight: 'bold', family: 'monospace' } 
+            },
+            ticks: { display: false, stepSize: 20 },
+            suggestedMin: 0,
+            suggestedMax: 100
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFont: { size: 10, weight: 'bold' },
+            bodyFont: { size: 10 },
+            padding: 8,
+            displayColors: false
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [logistics]);
+
+  return (
+    <div className="w-full h-40 md:h-48 relative">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+};
+
+// --- Footfall Bar Chart Component ---
+const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    const labels = data.map(d => d.period);
+    const values = data.map(d => d.volume);
+
+    chartRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Predicted Density',
+          data: values,
+          backgroundColor: values.map(v => v >= 80 ? 'rgba(244, 63, 94, 0.6)' : v >= 50 ? 'rgba(245, 158, 11, 0.6)' : 'rgba(16, 185, 129, 0.6)'),
+          borderColor: values.map(v => v >= 80 ? '#fb7185' : v >= 50 ? '#fbbf24' : '#34d399'),
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { display: false }
+          },
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: 'rgba(255, 255, 255, 0.5)',
+              font: { size: 7, family: 'monospace', weight: 'bold' }
+            }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 6,
+            titleFont: { size: 9 },
+            bodyFont: { size: 9 }
+          }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [data]);
+
+  return (
+    <div className="w-full h-32 relative">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+};
+
+// --- Progress Indicator Component ---
+const MetricBar = ({ label, value, colorClass, textColorClass, glowClass }: { label: string, value: number, colorClass: string, textColorClass: string, glowClass: string }) => {
   return (
     <div className="space-y-1 flex flex-col">
       <div className="flex justify-between items-center text-[7px] font-black uppercase tracking-widest px-0.5">
-        <span className="text-white/80">{label}</span> {/* Brighter metric label */}
-        <span className={textColor}>{value}%</span>
+        <span className="text-white/80">{label}</span>
+        <span className={textColorClass}>{value}%</span>
       </div>
       <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
         <div 
-          className={`h-full ${barColor} ${glowColor} transition-all duration-1000 ease-out`} 
+          className={`h-full ${colorClass} ${glowClass} transition-all duration-1000 ease-out`} 
           style={{ width: `${value}%` }}
         />
       </div>
     </div>
   );
+};
+
+const SafetyMetricBar = ({ label, value }: { label: string, value: number }) => {
+  const barColor = value >= 80 ? 'bg-indigo-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  const textColor = value >= 80 ? 'text-indigo-400' : value >= 60 ? 'text-amber-400' : 'text-rose-400';
+  const glowColor = value >= 80 ? 'shadow-[0_0_8px_rgba(99,102,241,0.3)]' : value >= 60 ? 'shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'shadow-[0_0_8px_rgba(244,63,94,0.3)]';
+  return <MetricBar label={label} value={value} colorClass={barColor} textColorClass={textColor} glowClass={glowColor} />;
+};
+
+const LogisticsMetricBar = ({ label, value }: { label: string, value: number }) => {
+  const barColor = value >= 80 ? 'bg-emerald-500' : value >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+  const textColor = value >= 80 ? 'text-emerald-400' : value >= 60 ? 'text-amber-400' : 'text-rose-400';
+  const glowColor = value >= 80 ? 'shadow-[0_0_8px_rgba(16,185,129,0.3)]' : value >= 60 ? 'shadow-[0_0_8px_rgba(245,158,11,0.3)]' : 'shadow-[0_0_8px_rgba(244,63,94,0.3)]';
+  return <MetricBar label={label} value={value} colorClass={barColor} textColorClass={textColor} glowClass={glowColor} />;
 };
 
 // --- Global Audio Helpers ---
@@ -347,7 +540,15 @@ export default function App() {
           hours: p.hours,
           youtubeLink: p.youtubeLink,
           reviews: p.reviews || [],
-          safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
+          safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
+          urbanLogistics: p.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50 },
+          predictedFootfall: p.predictedFootfall || [
+            { period: "6am-10am", volume: 30 },
+            { period: "11am-2pm", volume: 70 },
+            { period: "3pm-6pm", volume: 50 },
+            { period: "7pm-10pm", volume: 85 },
+            { period: "11pm-2am", volume: 15 }
+          ]
         };
       });
       return [...baseShops, ...syncShops, ...vendorShops];
@@ -488,7 +689,15 @@ export default function App() {
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
         reviews: profile.reviews || [],
-        safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
+        safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
+        urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50 },
+        predictedFootfall: profile.predictedFootfall || [
+          { period: "6am-10am", volume: 30 },
+          { period: "11am-2pm", volume: 70 },
+          { period: "3pm-6pm", volume: 50 },
+          { period: "7pm-10pm", volume: 85 },
+          { period: "11pm-2am", volume: 15 }
+        ]
       };
       setShops(prev => [optimisticShop, ...prev.filter(s => s.id !== optimisticShop.id && s.id !== profile.id)]);
       addLog('Spatial', `Signal activation initiated for ${profile.name}. Broadcasting to local grid...`, 'processing');
@@ -699,12 +908,19 @@ const handleShopSelect = async (shop: Shop) => {
         emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
-        // Fix: Use 'regForm' instead of 'regHour' for endHour.
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
         reviews: [],
-        safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80 }
+        safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80 },
+        urbanLogistics: { transitAccessibility: 80, walkabilityScore: 80, parkingAvailability: 80 },
+        predictedFootfall: [
+          { period: "6am-10am", volume: 30 },
+          { period: "11am-2pm", volume: 70 },
+          { period: "3pm-6pm", volume: 50 },
+          { period: "7pm-10pm", volume: 85 },
+          { period: "11pm-2am", volume: 15 }
+        ]
       };
       setMyProfiles(prev => [...prev, newProfile]);
       addLog('Spatial', `Initial signal for "${regForm.name}" established.`, 'resolved');
@@ -1283,7 +1499,7 @@ const handleShopSelect = async (shop: Shop) => {
                                 <div className="space-y-10 pb-20">
                                   <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-[2.5rem] space-y-3 shadow-2xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📈</div>
-                                    <p className="text-[9px] font-black text-indigo-400 uppercase trackingwidest">Sector Synthesis</p>
+                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
                                     <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
                                   </div>
 
@@ -1398,14 +1614,52 @@ const handleShopSelect = async (shop: Shop) => {
                           </div>
                         </div>
                       ) : lensAnalysis ? (
-                        <div className="space-y-4 overflow-y-auto custom-scrollbar">
-                          {lensAnalysis.observations.map((obs, i) => (
-                            <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
-                              <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
-                              <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
-                              <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                        <div className="space-y-8 overflow-y-auto custom-scrollbar pb-10">
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
+                            {lensAnalysis.observations.map((obs, i) => (
+                              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
+                                <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
+                                <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
+                                <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Relocated Safety Intelligence */}
+                          {activeShop?.safetyMetrics && (
+                            <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
+                              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
+                              <SafetyRadar metrics={activeShop.safetyMetrics} />
+                              <div className="space-y-3 pt-2">
+                                <SafetyMetricBar label="Crime" value={activeShop.safetyMetrics.crimeSafety} />
+                                <SafetyMetricBar label="Police" value={activeShop.safetyMetrics.policeProximity} />
+                                <SafetyMetricBar label="Lighting" value={activeShop.safetyMetrics.lighting} />
+                              </div>
                             </div>
-                          ))}
+                          )}
+
+                          {/* Relocated Urban Logistics */}
+                          {activeShop?.urbanLogistics && (
+                            <div className="p-6 bg-emerald-600/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
+                              <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
+                              <LogisticsRadar logistics={activeShop.urbanLogistics} />
+                              <div className="space-y-3 pt-2">
+                                <LogisticsMetricBar label="Transit" value={activeShop.urbanLogistics.transitAccessibility} />
+                                <LogisticsMetricBar label="Walkability" value={activeShop.urbanLogistics.walkabilityScore} />
+                                <LogisticsMetricBar label="Parking" value={activeShop.urbanLogistics.parkingAvailability} />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Relocated Traffic Intelligence */}
+                          {activeShop?.predictedFootfall && (
+                            <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
+                              <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
+                              <FootfallChart data={activeShop.predictedFootfall} />
+                              <p className="text-[8px] text-rose-300/40 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="py-20 text-center opacity-20">
@@ -1679,32 +1933,20 @@ const handleShopSelect = async (shop: Shop) => {
           <div className="absolute bottom-6 left-4 right-4 md:bottom-10 md:left-10 md:right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700">
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col md:flex-row gap-6 md:gap-8 relative overflow-hidden border-t-white/20">
               <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 p-2 z-20 transition-all">✕</button>
-              <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0">
-                <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center">
+              
+              <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32">
+                <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center shrink-0">
                    <span>{activeShop.emoji}</span>
                 </div>
+                
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
-                  <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2">
+                  <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0">
                     <span className="text-amber-500 text-sm">⭐</span>
                     <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a, b) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
                   </div>
                 )}
-                
-                {/* Safety Score Dashboard */}
-                {activeShop.safetyMetrics && (
-                  <div className="p-4 bg-indigo-600/5 border border-indigo-500/20 rounded-3xl space-y-4 mt-2">
-                    <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest text-center border-b border-indigo-500/10 pb-2">Safety Intelligence</p>
-                    <SafetyRadar metrics={activeShop.safetyMetrics} />
-                    <div className="space-y-3 pt-2">
-                      <SafetyMetricBar label="Crime Safety" value={activeShop.safetyMetrics.crimeSafety} />
-                      <SafetyMetricBar label="Police Proximity" value={activeShop.safetyMetrics.policeProximity} />
-                      <SafetyMetricBar label="Footfall" value={activeShop.safetyMetrics.footfallIntensity} />
-                      <SafetyMetricBar label="Lighting" value={activeShop.safetyMetrics.lighting} />
-                      <SafetyMetricBar label="Vibe" value={activeShop.safetyMetrics.vibe} />
-                    </div>
-                  </div>
-                )}
               </div>
+
               <div className="flex-1 space-y-3 min-w-0 flex flex-col">
                 <div className="flex justify-between items-start gap-4">
                   <div className="space-y-1">
@@ -1716,7 +1958,7 @@ const handleShopSelect = async (shop: Shop) => {
                   </div>
                 </div>
                 
-                <div className="flex-1 space-y-4 overflow-y-auto max-h-[160px] md:max-h-[220px] custom-scrollbar pr-2">
+                <div className="flex-1 space-y-4 overflow-y-auto max-h-[320px] md:max-h-[420px] custom-scrollbar pr-2">
                   <div className="space-y-3">
                     <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
                     {footfallPrediction && (
@@ -1753,7 +1995,7 @@ const handleShopSelect = async (shop: Shop) => {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 mt-auto">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 mt-auto shrink-0">
                   <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl text-center active:scale-95 transition-transform">🛰️ Navigate</a>
                   {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
                     <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl active:scale-95 transition-transform border border-emerald-400/20">🛒 Order Now</button>

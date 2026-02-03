@@ -1,3 +1,4 @@
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -30,6 +31,18 @@ export interface SafetyMetrics {
   vibe: number;
 }
 
+// Added UrbanLogistics interface to resolve "exported member not found" error in App.tsx
+export interface UrbanLogistics {
+  transitAccessibility: number;
+  walkabilityScore: number;
+  parkingAvailability: number;
+}
+
+export interface FootfallPoint {
+  period: string;
+  volume: number;
+}
+
 export interface Shop {
   id: string;
   name: string;
@@ -45,6 +58,9 @@ export interface Shop {
   youtubeLink?: string;
   reviews?: Review[];
   safetyMetrics?: SafetyMetrics;
+  // Added urbanLogistics property to Shop interface
+  urbanLogistics?: UrbanLogistics;
+  predictedFootfall?: FootfallPoint[];
 }
 
 export interface VendorProfile {
@@ -59,6 +75,9 @@ export interface VendorProfile {
   youtubeLink?: string;
   reviews?: Review[];
   safetyMetrics?: SafetyMetrics;
+  // Added urbanLogistics property to VendorProfile interface
+  urbanLogistics?: UrbanLogistics;
+  predictedFootfall?: FootfallPoint[];
 }
 
 export interface AgentLog {

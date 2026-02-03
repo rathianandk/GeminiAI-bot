@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis } from "../types";
+import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis, FootfallPoint } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -44,7 +44,8 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     INSTRUCTIONS:
     1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
     2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. SAFETY ANALYSIS: Reason about local safety metrics based on neighborhood crime history, proximity to police stations, and predictive footfall patterns. 
+    3. SAFETY ANALYSIS: Reason about local safety metrics.
+    4. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
     
     REQUIRED JSON STRUCTURE:
     {
@@ -63,7 +64,14 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
             "footfallIntensity": 90, 
             "lighting": 80, 
             "vibe": 95
-          }
+          },
+          "predictedFootfall": [
+            {"period": "6am-10am", "volume": 40},
+            {"period": "11am-2pm", "volume": 85},
+            {"period": "3pm-6pm", "volume": 55},
+            {"period": "7pm-10pm", "volume": 95},
+            {"period": "11pm-2am", "volume": 20}
+          ]
         }
       ],
       "logs": [
@@ -72,7 +80,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
       ]
     }
     
-    CRITICAL: Values for safetyMetrics must be integers (0-100) where higher is safer/better. Output ONLY the raw JSON object. Do not include markdown formatting or conversational filler.`,
+    CRITICAL: Output ONLY the raw JSON object. Do not include markdown formatting.`,
     config: {
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -117,7 +125,14 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
     isVendor: false,
     reviews: [],
-    safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 }
+    safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70 },
+    predictedFootfall: s.predictedFootfall || [
+      { period: "6am-10am", volume: 30 },
+      { period: "11am-2pm", volume: 70 },
+      { period: "3pm-6pm", volume: 50 },
+      { period: "7pm-10pm", volume: 85 },
+      { period: "11pm-2am", volume: 15 }
+    ]
   }));
 
   const resultLogs = (data.logs && data.logs.length > 0) ? data.logs : ["Grid scan successful. Visualizing nodes."];
