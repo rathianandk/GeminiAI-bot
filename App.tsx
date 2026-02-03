@@ -134,6 +134,75 @@ const SEED_PROFILES: VendorProfile[] = [
   }
 ];
 
+// --- Success Reasoning Chart Component ---
+const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    // Data aggregation for "Success Reasoning"
+    const sanitation = shop.hygieneScore || 0;
+    const safety = shop.safetyMetrics ? 
+      (shop.safetyMetrics.crimeSafety + shop.safetyMetrics.vibe + shop.safetyMetrics.lighting) / 3 : 0;
+    const logistics = shop.urbanLogistics ? 
+      (shop.urbanLogistics.transitAccessibility + shop.urbanLogistics.walkabilityScore + shop.urbanLogistics.parkingAvailability) / 3 : 0;
+    const vitality = shop.predictedFootfall ? 
+      shop.predictedFootfall.reduce((acc, curr) => acc + curr.volume, 0) / shop.predictedFootfall.length : 0;
+
+    chartRef.current = new Chart(ctx, {
+      type: 'polarArea',
+      data: {
+        labels: ['S-Sanitation', 'Safety Vibe', 'Logistics', 'Grid Vitality'],
+        datasets: [{
+          data: [sanitation, safety, logistics, vitality],
+          backgroundColor: [
+            'rgba(16, 185, 129, 0.4)', // Emerald
+            'rgba(99, 102, 241, 0.4)', // Indigo
+            'rgba(245, 158, 11, 0.4)', // Amber
+            'rgba(244, 63, 94, 0.4)'   // Rose
+          ],
+          borderColor: [
+            '#10b981', '#6366f1', '#f59e0b', '#f43f5e'
+          ],
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { display: false },
+            angleLines: { display: false },
+            suggestedMax: 100
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [shop]);
+
+  return (
+    <div className="w-full h-32 md:h-40 relative group">
+      <canvas ref={canvasRef} />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm rounded-2xl">
+         <span className="text-[8px] font-black text-white uppercase tracking-widest text-center px-4">Success Breakdown Index</span>
+      </div>
+    </div>
+  );
+};
+
 // --- Hygiene Gauge Component ---
 const HygieneGauge = ({ score }: { score: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -178,7 +247,7 @@ const HygieneGauge = ({ score }: { score: number }) => {
       <canvas ref={canvasRef} />
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
         <span className="text-[14px] font-black text-white">{score}%</span>
-        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest">S-Sanitation</span>
+        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest text-center">S-Sanitation</span>
       </div>
     </div>
   );
@@ -1662,7 +1731,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   </div>
 
                                   <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">S-Sanitation (Infra + Env Index)</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">S-Sanitation Index (Infra + Env)</p>
                                     <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4 shadow-inner">
                                        <RegionalHygieneChart shops={discoveredShops} />
                                        <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-widest">Regional Stress-Weighted Health Spectrum</p>
@@ -2113,7 +2182,7 @@ const handleShopSelect = async (shop: Shop) => {
         {activeShop && !isOrdering && (
           <div className="absolute bottom-6 left-4 right-4 md:bottom-10 md:left-10 md:right-10 z-[1000] animate-in slide-in-from-bottom-10 duration-700">
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col md:flex-row gap-6 md:gap-8 relative overflow-hidden border-t-white/20">
-              <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 p-2 z-20 transition-all">✕</button>
+              <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 p-2 transition-all z-[30]">✕</button>
               
               <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32 items-center md:items-start">
                 <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center shrink-0">
@@ -2128,7 +2197,7 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
 
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
-                  <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0">
+                  <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0 w-full">
                     <span className="text-amber-500 text-sm">⭐</span>
                     <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a, b) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
                   </div>
@@ -2147,14 +2216,22 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
                 
                 <div className="flex-1 space-y-4 overflow-y-auto max-h-[320px] md:max-h-[420px] custom-scrollbar pr-2">
-                  <div className="space-y-3">
-                    <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
-                    {footfallPrediction && (
-                      <div className="bg-indigo-600/10 border border-indigo-500/20 p-3 md:p-4 rounded-2xl">
-                        <p className="text-[7px] md:text-[8px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
-                        <p className="text-[10px] md:text-[11px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
-                      </div>
-                    )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
+                      {footfallPrediction && (
+                        <div className="bg-indigo-600/10 border border-indigo-500/20 p-3 md:p-4 rounded-2xl">
+                          <p className="text-[7px] md:text-[8px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
+                          <p className="text-[10px] md:text-[11px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Success Reasoning Chart for Every Vendor Location */}
+                    <div className="bg-white/5 border border-white/5 rounded-3xl p-4 space-y-2">
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Reasoning Profile</p>
+                      <SuccessReasoningChart shop={activeShop} />
+                    </div>
                   </div>
 
                   <div className="space-y-3">
