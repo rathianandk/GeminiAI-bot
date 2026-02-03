@@ -2102,15 +2102,6 @@ const handleShopSelect = async (shop: Shop) => {
                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Cuisine Specialty</label>
                     <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
                   </div>
-                  <div className="space-y-4">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">S-Sanitation Index (Infra/Env) ({regForm.hygieneScore}%)</label>
-                    <input type="range" min="0" max="100" value={regForm.hygieneScore} onChange={e => setRegForm({...regForm, hygieneScore: parseInt(e.target.value)})} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
-                    <div className="flex justify-between text-[7px] font-black uppercase text-white/40 tracking-widest px-1">
-                       <span>Low Alpha</span>
-                       <span>Mid Range</span>
-                       <span>Optimal</span>
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Manual Coordinates (DMS)</label>
                     <div className="flex gap-2">
