@@ -303,7 +303,7 @@ const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
           x: {
             grid: { display: false },
             ticks: {
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: 'rgba(255, 255, 255, 0.95)',
               font: { size: 7, family: 'monospace', weight: 'bold' }
             }
           }
@@ -1709,7 +1709,7 @@ const handleShopSelect = async (shop: Shop) => {
                             <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
                               <FootfallChart data={lensShopData.predictedFootfall} />
-                              <p className="text-[8px] text-rose-300/40 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
+                              <p className="text-[8px] text-rose-300/90 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}
                         </div>
