@@ -158,27 +158,25 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
     chartRef.current = new Chart(ctx, {
       type: 'polarArea',
       data: {
-        labels: ['S-Sanitation', 'Safety Vibe', 'Logistics', 'Grid Vitality'],
+        labels: ['Sanitation', 'Safety', 'Logistics', 'Vitality'],
         datasets: [{
           data: [sanitation, safety, logistics, vitality],
           backgroundColor: [
-            'rgba(16, 185, 129, 0.4)', // Emerald
-            'rgba(99, 102, 241, 0.4)', // Indigo
-            'rgba(245, 158, 11, 0.4)', // Amber
-            'rgba(244, 63, 94, 0.4)'   // Rose
+            'rgba(16, 185, 129, 0.85)', // Emerald
+            'rgba(99, 102, 241, 0.85)', // Indigo
+            'rgba(245, 158, 11, 0.85)', // Amber
+            'rgba(244, 63, 94, 0.85)'   // Rose
           ],
-          borderColor: [
-            '#10b981', '#6366f1', '#f59e0b', '#f43f5e'
-          ],
-          borderWidth: 1,
+          borderColor: '#ffffff',
+          borderWidth: 1.5,
         }]
       },
       options: {
         scales: {
           r: {
-            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
             ticks: { display: false },
-            angleLines: { display: false },
+            angleLines: { display: true, color: 'rgba(255, 255, 255, 0.1)' },
             suggestedMax: 100
           }
         },
@@ -193,11 +191,29 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
     return () => chartRef.current?.destroy();
   }, [shop]);
 
+  const logicPoints = [
+    { label: 'Sanitation', outcome: 'Trust Focus', icon: '✨', color: 'text-emerald-400' },
+    { label: 'Safety', outcome: 'Stay Duration', icon: '🛡️', color: 'text-indigo-400' },
+    { label: 'Logistics', outcome: 'Grid Access', icon: '🚛', color: 'text-amber-400' },
+    { label: 'Vitality', outcome: 'Node Density', icon: '📈', color: 'text-rose-400' }
+  ];
+
   return (
-    <div className="w-full h-32 md:h-40 relative group">
-      <canvas ref={canvasRef} />
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-sm rounded-2xl">
-         <span className="text-[8px] font-black text-white uppercase tracking-widest text-center px-4">Success Breakdown Index</span>
+    <div className="flex flex-col gap-4">
+      <div className="w-full h-40 md:h-48 relative">
+        <canvas ref={canvasRef} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 p-3 bg-black/40 rounded-2xl border border-white/5">
+        <p className="col-span-2 text-[7px] font-black text-white/40 uppercase tracking-[0.3em] text-center mb-1">Success Logic: Cause & Effect</p>
+        {logicPoints.map((point) => (
+          <div key={point.label} className="flex items-center gap-2 bg-white/5 p-2 rounded-xl">
+            <span className="text-[10px]">{point.icon}</span>
+            <div className="flex flex-col">
+              <span className={`text-[8px] font-black uppercase ${point.color}`}>{point.label}</span>
+              <span className="text-[7px] font-bold text-white/60 leading-none">→ {point.outcome}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1883,7 +1899,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
                                   <div className="flex flex-col gap-1.5">
                                     {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
-                                      <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/10 flex items-center gap-2">
+                                      <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
                                         <span className="text-10px]">🚌</span>
                                         <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
                                       </div>
@@ -2229,7 +2245,7 @@ const handleShopSelect = async (shop: Shop) => {
                     
                     {/* Success Reasoning Chart for Every Vendor Location */}
                     <div className="bg-white/5 border border-white/5 rounded-3xl p-4 space-y-2">
-                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Reasoning Profile</p>
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Breakdown Index</p>
                       <SuccessReasoningChart shop={activeShop} />
                     </div>
                   </div>
