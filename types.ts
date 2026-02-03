@@ -60,6 +60,7 @@ export interface Shop {
   safetyMetrics?: SafetyMetrics;
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
+  hygieneScore?: number;
 }
 
 export interface VendorProfile {
@@ -76,6 +77,7 @@ export interface VendorProfile {
   safetyMetrics?: SafetyMetrics;
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
+  hygieneScore?: number;
 }
 
 export interface AgentLog {
@@ -138,6 +140,7 @@ export interface SpatialAnalytics {
   legendaryIndex: { name: string; score: number; reasoning: string }[];
   customerSegmentation: { segment: string; description: string; volume: number }[];
   sectorSummary: string;
+  hygieneDistribution?: { range: string; count: number }[];
 }
 
 export interface FlavorEra {

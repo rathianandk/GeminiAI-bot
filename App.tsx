@@ -51,6 +51,7 @@ const SEED_SHOPS: Shop[] = [
     description: 'Legendary window-service spot in Mylapore.', 
     address: 'Mylapore, Chennai', 
     reviews: [], 
+    hygieneScore: 82,
     safetyMetrics: { 
       crimeSafety: 92, 
       policeProximity: 65, 
@@ -83,6 +84,7 @@ const SEED_SHOPS: Shop[] = [
     description: 'The most iconic Rose Milk in the city.', 
     address: 'South Mada St, Chennai', 
     reviews: [], 
+    hygieneScore: 94,
     safetyMetrics: { 
       crimeSafety: 95, 
       policeProximity: 85, 
@@ -118,6 +120,7 @@ const SEED_PROFILES: VendorProfile[] = [
     menu: [{ name: 'Mutton Biryani', price: 250, isSoldOut: false }, { name: 'Chicken 65', price: 120, isSoldOut: false }],
     hours: '12:00 - 23:00',
     reviews: [],
+    hygieneScore: 78,
     safetyMetrics: { crimeSafety: 75, policeProximity: 60, footfallIntensity: 95, lighting: 65, vibe: 85, nearestPoliceStations: ["Triplicane Police Station"] },
     urbanLogistics: { transitAccessibility: 85, walkabilityScore: 70, parkingAvailability: 45, publicTransportNodes: ["Triplicane High Road Bus Stop", "Government Estate Metro"] },
     predictedFootfall: [
@@ -129,6 +132,111 @@ const SEED_PROFILES: VendorProfile[] = [
     ]
   }
 ];
+
+// --- Hygiene Gauge Component ---
+const HygieneGauge = ({ score }: { score: number }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    const color = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#f43f5e';
+
+    chartRef.current = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [score, 100 - score],
+          backgroundColor: [color, 'rgba(255, 255, 255, 0.05)'],
+          borderWidth: 0,
+          circumference: 240,
+          rotation: 240,
+          cutout: '85%',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [score]);
+
+  return (
+    <div className="relative w-24 h-24">
+      <canvas ref={canvasRef} />
+      <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+        <span className="text-[14px] font-black text-white">{score}%</span>
+        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest">Hygiene</span>
+      </div>
+    </div>
+  );
+};
+
+// --- Regional Hygiene Chart Component ---
+const RegionalHygieneChart = ({ shops }: { shops: Shop[] }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || shops.length === 0) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    const sortedShops = [...shops].sort((a, b) => (b.hygieneScore || 0) - (a.hygieneScore || 0)).slice(0, 6);
+    const labels = sortedShops.map(s => s.name);
+    const data = sortedShops.map(s => s.hygieneScore || 0);
+
+    chartRef.current = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Spatial Hygiene Index',
+          data: data,
+          backgroundColor: 'rgba(16, 185, 129, 0.5)',
+          borderColor: '#10b981',
+          borderWidth: 1,
+          borderRadius: 5,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { color: 'rgba(255, 255, 255, 0.5)', font: { size: 8 } }
+          },
+          y: {
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: 'rgba(255, 255, 255, 0.8)', font: { size: 9, family: 'monospace', weight: 'bold' } }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [shops]);
+
+  return <div className="w-full h-48 relative"><canvas ref={canvasRef} /></div>;
+};
 
 // --- Radar Chart Component ---
 const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
@@ -540,7 +648,8 @@ export default function App() {
     endHour: 22, 
     menu: [] as MenuItem[],
     youtubeLink: '',
-    manualDMS: ''
+    manualDMS: '',
+    hygieneScore: 85
   });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
 
@@ -565,6 +674,7 @@ export default function App() {
           hours: p.hours,
           youtubeLink: p.youtubeLink,
           reviews: p.reviews || [],
+          hygieneScore: p.hygieneScore || 85,
           safetyMetrics: p.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
           urbanLogistics: p.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
           predictedFootfall: p.predictedFootfall || [
@@ -714,6 +824,7 @@ export default function App() {
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
         reviews: profile.reviews || [],
+        hygieneScore: profile.hygieneScore || 85,
         safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
         urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
         predictedFootfall: profile.predictedFootfall || [
@@ -901,7 +1012,8 @@ const handleShopSelect = async (shop: Shop) => {
       endHour: end || 22,
       menu: [...(profile.menu || [])],
       youtubeLink: profile.youtubeLink || '',
-      manualDMS: ''
+      manualDMS: '',
+      hygieneScore: profile.hygieneScore || 85
     });
     setIsEditing(true);
     setIsRegistering(true);
@@ -922,7 +1034,8 @@ const handleShopSelect = async (shop: Shop) => {
         description: regForm.description,
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
-        youtubeLink: regForm.youtubeLink
+        youtubeLink: regForm.youtubeLink,
+        hygieneScore: regForm.hygieneScore
       } : p));
       addLog('Spatial', `Node "${regForm.name}" updated in central registry.`, 'resolved');
     } else {
@@ -938,6 +1051,7 @@ const handleShopSelect = async (shop: Shop) => {
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
         reviews: [],
+        hygieneScore: regForm.hygieneScore,
         safetyMetrics: { crimeSafety: 80, policeProximity: 80, footfallIntensity: 80, lighting: 80, vibe: 80, nearestPoliceStations: [] },
         urbanLogistics: { transitAccessibility: 80, walkabilityScore: 80, parkingAvailability: 80, publicTransportNodes: [] },
         predictedFootfall: [
@@ -952,7 +1066,7 @@ const handleShopSelect = async (shop: Shop) => {
       addLog('Spatial', `Initial signal for "${regForm.name}" established.`, 'resolved');
       targetId = newId;
     }
-    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '' });
+    setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '', hygieneScore: 85 });
     setIsRegistering(false);
     setIsEditing(false);
     if (targetId) setActiveProfileId(targetId);
@@ -1319,7 +1433,7 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
               ) : (
                 <button onClick={() => { 
-                  setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '' });
+                  setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '', hygieneScore: 85 });
                   setIsEditing(false); 
                   setIsRegistering(true); 
                 }} className="w-full py-12 border border-dashed border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/5 text-indigo-400/60 hover:text-indigo-400 text-[10px] font-black uppercase rounded-[3rem] transition-all group overflow-hidden relative shadow-inner">
@@ -1547,6 +1661,14 @@ const handleShopSelect = async (shop: Shop) => {
                                   </div>
 
                                   <div className="space-y-4">
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Spatial Hygiene Comparison</p>
+                                    <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4 shadow-inner">
+                                       <RegionalHygieneChart shops={discoveredShops} />
+                                       <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-widest">Regional Hygiene Spectrum</p>
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
                                       {analytics.priceSpectrum.map((p, i) => (
@@ -1652,7 +1774,6 @@ const handleShopSelect = async (shop: Shop) => {
                             ))}
                           </div>
 
-                          {/* Relocated Safety Intelligence with Police Stations - Linked to lensShopData for persistence */}
                           {lensShopData?.safetyMetrics && (
                             <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
@@ -1678,7 +1799,6 @@ const handleShopSelect = async (shop: Shop) => {
                             </div>
                           )}
 
-                          {/* Relocated Urban Logistics with Transit Nodes - Linked to lensShopData for persistence */}
                           {lensShopData?.urbanLogistics && (
                             <div className="p-6 bg-emerald-600/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
@@ -1704,7 +1824,6 @@ const handleShopSelect = async (shop: Shop) => {
                             </div>
                           )}
 
-                          {/* Relocated Traffic Intelligence - Linked to lensShopData for persistence */}
                           {lensShopData?.predictedFootfall && (
                             <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
@@ -1897,6 +2016,15 @@ const handleShopSelect = async (shop: Shop) => {
                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Cuisine Specialty</label>
                     <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
                   </div>
+                  <div className="space-y-4">
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Spatial Hygiene Rating ({regForm.hygieneScore}%)</label>
+                    <input type="range" min="0" max="100" value={regForm.hygieneScore} onChange={e => setRegForm({...regForm, hygieneScore: parseInt(e.target.value)})} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
+                    <div className="flex justify-between text-[7px] font-black uppercase text-white/40 tracking-widest px-1">
+                       <span>Low Alpha</span>
+                       <span>Mid Range</span>
+                       <span>Optimal</span>
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Manual Coordinates (DMS)</label>
                     <div className="flex gap-2">
@@ -1986,11 +2114,18 @@ const handleShopSelect = async (shop: Shop) => {
             <div className="max-w-4xl mx-auto bg-black/95 backdrop-blur-3xl p-6 md:p-8 rounded-[2.5rem] md:rounded-[3rem] border border-white/10 shadow-[0_25px_100px_rgba(0,0,0,0.8)] flex flex-col md:flex-row gap-6 md:gap-8 relative overflow-hidden border-t-white/20">
               <button onClick={() => { stopAudio(); setActiveShop(null); }} className="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white/60 p-2 z-20 transition-all">✕</button>
               
-              <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32">
+              <div className="flex flex-col gap-4 shrink-0 mx-auto md:mx-0 w-full md:w-32 items-center md:items-start">
                 <div className="text-5xl md:text-7xl bg-white/5 p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] border border-white/5 h-fit shadow-2xl flex items-center justify-center shrink-0">
                    <span>{activeShop.emoji}</span>
                 </div>
                 
+                <div className="mt-2 group relative">
+                   <HygieneGauge score={activeShop.hygieneScore || 85} />
+                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-lg text-[7px] font-black text-white/60 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10 pointer-events-none z-30">
+                     Spatial Hygiene Confidence
+                   </div>
+                </div>
+
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0">
                     <span className="text-amber-500 text-sm">⭐</span>
