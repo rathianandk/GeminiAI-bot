@@ -10,6 +10,7 @@ import {
   generateVendorBio, 
   spatialChatAgent, 
   spatialChatAgent as chatAgent, 
+  spatialChatAgent as chatAgentAlias, 
   spatialLensAnalysis, 
   generateSpatialAnalytics,
   getFlavorGenealogy,
@@ -177,7 +178,7 @@ const HygieneGauge = ({ score }: { score: number }) => {
       <canvas ref={canvasRef} />
       <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
         <span className="text-[14px] font-black text-white">{score}%</span>
-        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest">Hygiene</span>
+        <span className="text-[6px] font-black text-white/40 uppercase tracking-widest">S-Sanitation</span>
       </div>
     </div>
   );
@@ -204,7 +205,7 @@ const RegionalHygieneChart = ({ shops }: { shops: Shop[] }) => {
       data: {
         labels: labels,
         datasets: [{
-          label: 'Spatial Hygiene Index',
+          label: 'Spatial Sanitation Index',
           data: data,
           backgroundColor: 'rgba(16, 185, 129, 0.5)',
           borderColor: '#10b981',
@@ -1626,7 +1627,7 @@ const handleShopSelect = async (shop: Shop) => {
                         <>
                           <div className="flex bg-[#0a0a0a] p-1.5 rounded-2xl border border-white/5 shadow-inner">
                             <button onClick={() => setDiscoverySubTab('nodes')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Nodes</button>
-                            <button onClick={() => setDiscoverySubTab('intelligence')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Intelligence</button>
+                            <button onClick={() => { setDiscoverySubTab('intelligence'); computeAnalytics(); }} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Intelligence</button>
                           </div>
                           {discoverySubTab === 'intelligence' && (
                             <div className="space-y-8 animate-in fade-in duration-700">
@@ -1661,10 +1662,10 @@ const handleShopSelect = async (shop: Shop) => {
                                   </div>
 
                                   <div className="space-y-4">
-                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Spatial Hygiene Comparison</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">S-Sanitation (Infra + Env Index)</p>
                                     <div className="p-6 bg-white/5 border border-white/5 rounded-[2rem] space-y-4 shadow-inner">
                                        <RegionalHygieneChart shops={discoveredShops} />
-                                       <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-widest">Regional Hygiene Spectrum</p>
+                                       <p className="text-[8px] font-bold text-slate-500 uppercase text-center tracking-widest">Regional Stress-Weighted Health Spectrum</p>
                                     </div>
                                   </div>
 
@@ -1789,7 +1790,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="flex flex-col gap-1.5">
                                     {lensShopData.safetyMetrics.nearestPoliceStations.map((station, i) => (
                                       <div key={i} className="px-3 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-[10px]">👮</span>
+                                        <span className="text-10px]">👮</span>
                                         <span className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
                                       </div>
                                     ))}
@@ -1814,7 +1815,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="flex flex-col gap-1.5">
                                     {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
                                       <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-emerald-500/10 flex items-center gap-2">
-                                        <span className="text-[10px]">🚌</span>
+                                        <span className="text-10px]">🚌</span>
                                         <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
                                       </div>
                                     ))}
@@ -1828,7 +1829,7 @@ const handleShopSelect = async (shop: Shop) => {
                             <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
                               <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
                               <FootfallChart data={lensShopData.predictedFootfall} />
-                              <p className="text-[8px] text-rose-300/90 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
+                              <p className="text-[8px] text-rose-300/95 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}
                         </div>
@@ -2017,7 +2018,7 @@ const handleShopSelect = async (shop: Shop) => {
                     <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
                   </div>
                   <div className="space-y-4">
-                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Spatial Hygiene Rating ({regForm.hygieneScore}%)</label>
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">S-Sanitation Index (Infra/Env) ({regForm.hygieneScore}%)</label>
                     <input type="range" min="0" max="100" value={regForm.hygieneScore} onChange={e => setRegForm({...regForm, hygieneScore: parseInt(e.target.value)})} className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500" />
                     <div className="flex justify-between text-[7px] font-black uppercase text-white/40 tracking-widest px-1">
                        <span>Low Alpha</span>
@@ -2122,7 +2123,7 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="mt-2 group relative">
                    <HygieneGauge score={activeShop.hygieneScore || 85} />
                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-black/80 backdrop-blur-md rounded-lg text-[7px] font-black text-white/60 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-white/10 pointer-events-none z-30">
-                     Spatial Hygiene Confidence
+                     Infra + Env Sanitation Health
                    </div>
                 </div>
 

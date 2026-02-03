@@ -43,7 +43,9 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     INSTRUCTIONS:
     1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
     2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. HYGIENE ANALYSIS: Reason about local hygiene standards (0-100) based on location and reviews.
+    3. SPATIAL HYGIENE INDEX (hygieneScore): Strictly calculate this score (0-100) based on the "Infrastructure and Environmental status". 
+       - Infrastructure: Waste management proximity, pavement drainage, and lighting.
+       - Environmental: Traffic air-stress, noise levels, and shade availability.
     4. SAFETY ANALYSIS: Reason about local safety metrics and identify exactly the top 3 nearest police station names.
     5. URBAN LOGISTICS: Reason about Public Transit, Walkability, and Parking. Identify exactly the top 3 nearest public transport nodes (Bus stops, Metro stations, Railway).
     6. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
