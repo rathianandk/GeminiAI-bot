@@ -50,20 +50,6 @@ export interface SuccessReasoning {
   economicFit: number;
 }
 
-export interface FlavorFingerprint {
-  spicy: number;
-  tangy: number;
-  umami: number;
-  sweet: number;
-  summary: string;
-}
-
-export interface CrossVendorRecommendation {
-  shopName: string;
-  reason: string;
-  distance: string;
-}
-
 export interface Shop {
   id: string;
   name: string;
@@ -82,6 +68,7 @@ export interface Shop {
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
   successReasoning?: SuccessReasoning;
+  // Added hygieneScore to support vendor node reporting
   hygieneScore?: number;
 }
 
@@ -100,6 +87,7 @@ export interface VendorProfile {
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
   successReasoning?: SuccessReasoning;
+  // Added hygieneScore to support management of partner nodes
   hygieneScore?: number;
 }
 
@@ -147,8 +135,6 @@ export interface FoodAnalysis {
   authenticity_score: string;
   narrative: string;
   error?: string;
-  flavorFingerprint?: FlavorFingerprint;
-  recommendations?: CrossVendorRecommendation[];
 }
 
 export interface LensAnalysis {
