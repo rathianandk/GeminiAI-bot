@@ -1,12 +1,13 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis, FootfallPoint } from "../types";
 
+// Initialization of the Gemini client using the injected environment variable
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Predictive Footfall Agent
- * Uses Gemini 3 to reason about expected wait times and demand based on 
- * shop type, neighborhood, and current time context.
+ * Utilizes Gemini 3 to synthesize real-time context (day, time) with neighborhood-specific 
+ * knowledge to predict wait times and urban demand.
  */
 export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
   const now = new Date();
@@ -35,6 +36,11 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
   return (response.text || "").trim();
 };
 
+/**
+ * Discovery Agent
+ * Scans a 5km radius using Google Maps and Search grounding tools to identify legendary 
+ * food nodes and hidden gems with full spatial and safety telemetry.
+ */
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
@@ -132,12 +138,14 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     data.shops = [];
   }
 
+  // Extract grounding citations for UI transparency
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const sources: GroundingSource[] = groundingChunks.map((c: any) => ({
     title: c.web?.title || c.maps?.title || "Reference Node",
     uri: c.web?.uri || c.maps?.uri || "#"
   }));
 
+  // Sanitize and normalize incoming data from LLM
   const sanitizedShops = (data.shops || []).map((s: any, idx: number) => ({
     ...s,
     id: s.id && typeof s.id === 'string' && s.id.startsWith('sync-') ? s.id : `sync-${idx}-${Date.now()}`,
@@ -160,6 +168,11 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   return { shops: sanitizedShops as Shop[], logs: resultLogs as string[], sources };
 };
 
+/**
+ * Image Analysis Agent
+ * Multimodal vision task that identifies food, traces genealogy, and estimates nutrition 
+ * from a raw image capture or upload.
+ */
 export const analyzeFoodImage = async (base64Data: string, mimeType: string): Promise<FoodAnalysis> => {
   const imagePart = {
     inlineData: {
@@ -207,6 +220,7 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
   const text = response.text || "";
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   
+  // Clean narrative by removing JSON and meta markers
   const narrative = text
     .replace(/\{[\s\S]*\}/, "") 
     .replace(/PART\s*[AB]/gi, "") 
@@ -236,6 +250,11 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
   };
 };
 
+/**
+ * Spatial Analytics Agent
+ * Aggregates a collection of food nodes into high-level intelligence dashboards 
+ * using structured output schema.
+ */
 export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAnalytics> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -309,6 +328,11 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
   return JSON.parse(response.text || "{}");
 };
 
+/**
+ * Flavor Genealogy Agent
+ * Uses deep reasoning over massive historical contexts to trace the evolution of local 
+ * flavors across distinct colonial and cultural eras.
+ */
 export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGenealogy> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -358,6 +382,11 @@ export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGeneal
   return JSON.parse(response.text || "{}");
 };
 
+/**
+ * Order Parsing Agent
+ * Intelligent linguistic parser that translates natural language (English/Tamil) orders 
+ * into structured cart items based on the active menu.
+ */
 export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -401,6 +430,11 @@ export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
   return JSON.parse(response.text || "{\"orderItems\":[], \"totalPrice\":0}");
 };
 
+/**
+ * Spatial Lens Agent
+ * Intensive visual and urban planning scrape that reasoning about sidewalk proxemics, 
+ * layout efficiency, and structural categories (rooftop vs stall).
+ */
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -465,6 +499,10 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
   return JSON.parse(response.text || "{}");
 };
 
+/**
+ * Linguistic Agent: Hyper-local Summary
+ * Translates a node's vibe into street-level English/Tamil using Madras Bashai slang.
+ */
 export const getTamilTextSummary = async (shop: Shop) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -483,6 +521,10 @@ export const getTamilTextSummary = async (shop: Shop) => {
   return JSON.parse(response.text || "{}");
 };
 
+/**
+ * Linguistic Agent: Audio Summary
+ * Generates enthusiastic Tamil speech for the spatial popup.
+ */
 export const getTamilAudioSummary = async (shop: Shop) => {
   const summary = await getTamilTextSummary(shop);
   const response = await ai.models.generateContent({
@@ -496,6 +538,9 @@ export const getTamilAudioSummary = async (shop: Shop) => {
   return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 };
 
+/**
+ * Analytics Agent: Vendor Bio Generator
+ */
 export const generateVendorBio = async (name: string, cuisine: string) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
@@ -504,6 +549,10 @@ export const generateVendorBio = async (name: string, cuisine: string) => {
   return (response.text || "").trim();
 };
 
+/**
+ * Spatial Agent: LIVE Broadcast Alert
+ * Creates an enthusiastic Tamil broadcast message and audio for vendors going live.
+ */
 export const spatialAlertAgent = async (vendorName: string, location: LatLng) => {
   const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized broadcast message in Tamil.`;
   const textResponse = await ai.models.generateContent({
@@ -524,6 +573,10 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
   };
 };
 
+/**
+ * Spatial Chat Agent
+ * The primary grounding engine for natural language inquiries about the food grid.
+ */
 export const spatialChatAgent = async (message: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
