@@ -160,7 +160,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
   return { shops: sanitizedShops as Shop[], logs: resultLogs as string[], sources };
 };
 
-export const analyzeFoodImage = async (base64Data: string, mimeType: string): Promise<FoodAnalysis> => {
+export const analyzeFoodImage = async (base64Data: string, mimeType: string, nearbyShops: Shop[] = []): Promise<FoodAnalysis> => {
   const imagePart = {
     inlineData: {
       mimeType: mimeType,
@@ -168,7 +168,7 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
     },
   };
   const textPart = {
-    text: `MISSION: LENS MODE SPATIAL FOOD ANALYSIS.
+    text: `MISSION: LENS MODE SPATIAL FOOD ANALYSIS & FLAVOR FINGERPRINTING.
     FIRST: Determine if this image contains food or a street-food stall.
     
     IF NOT FOOD: 
@@ -176,15 +176,18 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
     Return PART B (JSON): { "error": "NOT_FOOD_DETECTED" }
     
     IF FOOD:
-    1. Identification: Identify the primary dish and any visible sides.
-    2. Flavour Genealogy: Trace the historical spice migration and cultural origin of this dish to the modern street corner using your 1M token context of culinary history.
-    3. Nutritional Inference: Estimate Protein (g), Calories (kcal), and Carbs (g).
-    4. Spatial Vibe: Detect the "Authenticity Level" (0-100%) based on environment/plating.
+    1. Identification: Identify the primary dish.
+    2. Flavour Genealogy: Trace the historical origin of this dish using your 1M token context.
+    3. FLAVOR FINGERPRINT: Analyze the intensities (0-100) for: Spicy, Tangy, Umami, Sweet.
+    4. CROSS-VENDOR RECOMMENDATIONS: Based on this fingerprint and the nearby grid data: ${JSON.stringify(nearbyShops.map(s => ({name: s.name, cuisine: s.cuisine})))}
+       - Suggest a "Flavor Match": "If you love this Spicy [Dish], you must try the Andhra stall 200m away."
+       - Suggest a "Complementary Node": "Order biryani here, but walk 5 mins to [Shop Name] for perfect raita."
+    5. Nutritional Inference: Estimate Protein, Calories, and Carbs.
     
     Return the response in two strictly separated parts:
     
     PART A (Narrative): 
-    A 3-sentence "Local Fixer" story about the food's history and soul.
+    A 3-sentence "Local Fixer" story about the food's history.
     
     PART B (JSON): 
     { 
@@ -193,7 +196,17 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
       "calories": "number + kcal", 
       "carbs": "number + g",
       "history_tags": ["tag1", "tag2"], 
-      "authenticity_score": "number%" 
+      "authenticity_score": "number%",
+      "flavorFingerprint": {
+        "spicy": 85,
+        "tangy": 40,
+        "umami": 90,
+        "sweet": 10,
+        "summary": "Deeply savory and intensely spiced..."
+      },
+      "recommendations": [
+        { "shopName": "Name", "reason": "Reason", "distance": "distance" }
+      ]
     }
     
     STRICT FORMAT: Provide PART A and then PART B as a JSON block.`,

@@ -36,7 +36,8 @@ import {
   SafetyMetrics,
   UrbanLogistics,
   FootfallPoint,
-  SuccessReasoning
+  SuccessReasoning,
+  FlavorFingerprint
 } from './types';
 
 // Register Chart.js components
@@ -214,6 +215,64 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
           </div>
         ))}
       </div>
+    </div>
+  );
+};
+
+// --- Flavor Fingerprint Chart Component ---
+const FlavorFingerprintChart = ({ fingerprint }: { fingerprint: FlavorFingerprint }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    chartRef.current = new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: ['Spicy', 'Tangy', 'Umami', 'Sweet'],
+        datasets: [{
+          label: 'Dish Profile',
+          data: [fingerprint.spicy, fingerprint.tangy, fingerprint.umami, fingerprint.sweet],
+          backgroundColor: 'rgba(239, 68, 68, 0.2)', // Red-ish
+          borderColor: 'rgba(239, 68, 68, 0.8)',
+          pointBackgroundColor: '#ef4444',
+          pointBorderColor: '#fff',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+            pointLabels: { 
+              color: 'rgba(255, 255, 255, 0.9)', 
+              font: { size: 10, weight: 'bold' } 
+            },
+            ticks: { display: false },
+            suggestedMin: 0,
+            suggestedMax: 100
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        },
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    });
+
+    return () => chartRef.current?.destroy();
+  }, [fingerprint]);
+
+  return (
+    <div className="w-full h-40 md:h-48 relative">
+      <canvas ref={canvasRef} />
     </div>
   );
 };
@@ -574,6 +633,7 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([{ id: '1', role: 'model', text: 'Vanakkam! Ask me anything about street food or landmarks.' }]);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const historyFileInputRef = useRef<HTMLInputElement>(null);
+  const lensFileInputRef = useRef<HTMLInputElement>(null);
   const currentShopIdRef = useRef<string | null>(null);
   const activeAgentTimeoutRef = useRef<number | null>(null);
 
@@ -893,13 +953,16 @@ const handleShopSelect = async (shop: Shop) => {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(',')[1];
-        const res = await analyzeFoodImage(base64, file.type);
+        const res = await analyzeFoodImage(base64, file.type, shops);
         
         if (res.error === "NOT_FOOD_DETECTED") {
           addLog('Historian', res.narrative, 'failed');
         } else {
           setImageFlavorAnalysis(res);
           addLog('Historian', `Identification: ${res.name}. Cross-temporal spice migration sync complete.`, 'resolved');
+          if (res.flavorFingerprint) {
+            addLog('Analytics', `Flavor Fingerprint derived: ${res.flavorFingerprint.summary}`, 'resolved');
+          }
         }
         setIsHistoryMining(false);
       };
@@ -1470,6 +1533,14 @@ const handleShopSelect = async (shop: Shop) => {
                         </div>
                         <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{imageFlavorAnalysis.narrative}"</p>
                         
+                        {imageFlavorAnalysis.flavorFingerprint && (
+                          <div className="bg-black/40 p-4 rounded-3xl border border-amber-500/20 space-y-2">
+                             <p className="text-[8px] font-black text-amber-400 uppercase tracking-[0.3em] text-center mb-1">Flavor Fingerprint Index</p>
+                             <FlavorFingerprintChart fingerprint={imageFlavorAnalysis.flavorFingerprint} />
+                             <p className="text-[9px] text-amber-300 font-bold italic leading-relaxed text-center px-4">"{imageFlavorAnalysis.flavorFingerprint.summary}"</p>
+                          </div>
+                        )}
+
                         <div className="grid grid-cols-3 gap-3 pt-2">
                            <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
                               <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Protein</p>
@@ -1492,6 +1563,23 @@ const handleShopSelect = async (shop: Shop) => {
                             <span key={i} className="text-[8px] px-3 py-1.5 bg-amber-500/10 text-amber-300 font-black uppercase rounded-xl border border-amber-500/20">#{tag}</span>
                           ))}
                         </div>
+
+                        {imageFlavorAnalysis.recommendations && imageFlavorAnalysis.recommendations.length > 0 && (
+                          <div className="pt-4 space-y-3">
+                            <p className="text-[9px] font-black text-amber-400 uppercase tracking-[0.4em] px-2">Cross-Vendor Insights</p>
+                            <div className="space-y-3">
+                              {imageFlavorAnalysis.recommendations.map((rec, i) => (
+                                <div key={i} className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1 group hover:bg-amber-500/20 transition-all cursor-pointer">
+                                  <div className="flex justify-between items-center">
+                                    <h4 className="text-[11px] font-black text-white uppercase tracking-tight">{rec.shopName}</h4>
+                                    <span className="text-[8px] font-black text-amber-300 uppercase">{rec.distance}</span>
+                                  </div>
+                                  <p className="text-[9px] text-slate-300 leading-relaxed italic">"{rec.reason}"</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1722,7 +1810,24 @@ const handleShopSelect = async (shop: Shop) => {
                            {lensTargetName || "Select a Food Node"}
                          </h4>
                       </div>
-                      {isLensAnalyzing ? (
+                      
+                      <div className="flex flex-col gap-4">
+                        <button 
+                          onClick={() => lensFileInputRef.current?.click()}
+                          className="w-full py-4 bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase rounded-2xl shadow-lg hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-3"
+                        >
+                          📷 Analyze Dish Fingerprint
+                        </button>
+                        <input 
+                          type="file" 
+                          ref={lensFileInputRef} 
+                          onChange={handleHistoryImageUpload} 
+                          accept="image/*" 
+                          className="hidden" 
+                        />
+                      </div>
+
+                      {isLensAnalyzing || isHistoryMining ? (
                         <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-500">
                           <div className="relative w-40 h-40 bg-indigo-600/5 rounded-3xl border border-indigo-500/20 overflow-hidden group">
                             <div className="absolute inset-0 bg-gradient-to-b from-indigo-500/20 to-transparent h-1/2 animate-scan"></div>
@@ -1735,36 +1840,37 @@ const handleShopSelect = async (shop: Shop) => {
                             <p className="text-[8px] text-white/20 uppercase tracking-widest">Cross-referencing spatial metadata</p>
                           </div>
                         </div>
-                      ) : lensAnalysis ? (
+                      ) : (imageFlavorAnalysis || lensAnalysis) ? (
                         <div className="space-y-8 overflow-y-auto custom-scrollbar pb-10">
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
-                            {lensAnalysis.observations.map((obs, i) => (
-                              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
-                                <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
-                                <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
-                                <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                          {imageFlavorAnalysis && (
+                            <div className="p-6 bg-rose-950/40 border border-rose-500/40 rounded-3xl space-y-4 shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom-4 duration-500">
+                              <div className="flex justify-between items-start">
+                                <div className="space-y-1">
+                                  <h3 className="text-xl font-black text-white uppercase tracking-tighter">{imageFlavorAnalysis.name}</h3>
+                                  <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Authenticity: {imageFlavorAnalysis.authenticity_score}</p>
+                                </div>
                               </div>
-                            ))}
-                          </div>
+                              <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-rose-500/40 pl-4 py-1">"{imageFlavorAnalysis.narrative}"</p>
+                              
+                              {imageFlavorAnalysis.flavorFingerprint && (
+                                <div className="bg-black/40 p-4 rounded-3xl border border-rose-500/20 space-y-2">
+                                   <p className="text-[8px] font-black text-rose-400 uppercase tracking-[0.3em] text-center mb-1">Flavor Fingerprint Index</p>
+                                   <FlavorFingerprintChart fingerprint={imageFlavorAnalysis.flavorFingerprint} />
+                                   <p className="text-[9px] text-rose-300 font-bold italic leading-relaxed text-center px-4">"{imageFlavorAnalysis.flavorFingerprint.summary}"</p>
+                                </div>
+                              )}
 
-                          {lensShopData?.safetyMetrics && (
-                            <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
-                              <SafetyRadar metrics={lensShopData.safetyMetrics} />
-                              <div className="space-y-3 pt-2">
-                                <SafetyMetricBar label="Crime" value={lensShopData.safetyMetrics.crimeSafety} />
-                                <SafetyMetricBar label="Police" value={lensShopData.safetyMetrics.policeProximity} />
-                                <SafetyMetricBar label="Lighting" value={lensShopData.safetyMetrics.lighting} />
-                              </div>
-                              {lensShopData.safetyMetrics.nearestPoliceStations && lensShopData.safetyMetrics.nearestPoliceStations.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-indigo-500/10">
-                                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Nearest Police Precincts</p>
-                                  <div className="flex flex-col gap-1.5">
-                                    {lensShopData.safetyMetrics.nearestPoliceStations.map((station, i) => (
-                                      <div key={i} className="px-3 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-10px]">👮</span>
-                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
+                              {imageFlavorAnalysis.recommendations && imageFlavorAnalysis.recommendations.length > 0 && (
+                                <div className="pt-2 space-y-3">
+                                  <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.4em] px-2">Cross-Vendor Recommendations</p>
+                                  <div className="space-y-2">
+                                    {imageFlavorAnalysis.recommendations.map((rec, i) => (
+                                      <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-1 group hover:bg-white/10 transition-all">
+                                        <div className="flex justify-between items-center">
+                                          <h4 className="text-[11px] font-black text-white uppercase tracking-tight">{rec.shopName}</h4>
+                                          <span className="text-[8px] font-black text-rose-400 uppercase">{rec.distance}</span>
+                                        </div>
+                                        <p className="text-[9px] text-slate-400 leading-relaxed italic">"{rec.reason}"</p>
                                       </div>
                                     ))}
                                   </div>
@@ -1773,36 +1879,30 @@ const handleShopSelect = async (shop: Shop) => {
                             </div>
                           )}
 
-                          {lensShopData?.urbanLogistics && (
-                            <div className="p-6 bg-emerald-600/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
-                              <LogisticsRadar logistics={lensShopData.urbanLogistics} />
-                              <div className="space-y-3 pt-2">
-                                <LogisticsMetricBar label="Transit" value={lensShopData.urbanLogistics.transitAccessibility} />
-                                <LogisticsMetricBar label="Walkability" value={lensShopData.urbanLogistics.walkabilityScore} />
-                                <LogisticsMetricBar label="Parking" value={lensShopData.urbanLogistics.parkingAvailability} />
+                          {lensAnalysis && (
+                            <div className="space-y-6">
+                              <div className="space-y-4">
+                                <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
+                                {lensAnalysis.observations.map((obs, i) => (
+                                  <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
+                                    <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
+                                    <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
+                                    <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                                  </div>
+                                ))}
                               </div>
-                              {lensShopData.urbanLogistics.publicTransportNodes && lensShopData.urbanLogistics.publicTransportNodes.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-emerald-500/10">
-                                  <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
-                                  <div className="flex flex-col gap-1.5">
-                                    {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
-                                      <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-10px]">🚌</span>
-                                        <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
-                                      </div>
-                                    ))}
+
+                              {lensShopData?.safetyMetrics && (
+                                <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
+                                  <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
+                                  <SafetyRadar metrics={lensShopData.safetyMetrics} />
+                                  <div className="space-y-3 pt-2">
+                                    <SafetyMetricBar label="Crime" value={lensShopData.safetyMetrics.crimeSafety} />
+                                    <SafetyMetricBar label="Police" value={lensShopData.safetyMetrics.policeProximity} />
+                                    <SafetyMetricBar label="Lighting" value={lensShopData.safetyMetrics.lighting} />
                                   </div>
                                 </div>
                               )}
-                            </div>
-                          )}
-
-                          {lensShopData?.predictedFootfall && (
-                            <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
-                              <FootfallChart data={lensShopData.predictedFootfall} />
-                              <p className="text-[8px] text-rose-300/95 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}
                         </div>
