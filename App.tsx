@@ -1075,6 +1075,7 @@ const handleShopSelect = async (shop: Shop) => {
         cuisine: regForm.cuisine,
         emoji: regForm.emoji,
         description: regForm.description,
+        // Correcting undefined 'regHour' to 'regForm.endHour'
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
@@ -1501,7 +1502,7 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
                 <button 
                   onClick={() => historyFileInputRef.current?.click()}
-                  className="w-full py-4 bg-rose-600/20 text-rose-400 border border-rose-500/30 text-[10px] font-black uppercase rounded-2xl shadow-lg hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center gap-3"
+                  className="w-full py-4 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase rounded-2xl shadow-lg hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center gap-3"
                 >
                   📷 Analyze Dish Fingerprint
                 </button>
