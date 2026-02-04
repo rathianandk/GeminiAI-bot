@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { LatLng, Shop, VendorStatus } from '../types';
 
@@ -42,7 +41,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         flex-direction: column;
         align-items: center;
         animation: pinDrop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        filter: invert(1) hue-rotate(180deg) drop-shadow(0 4px 12px rgba(0,0,0,0.5)); /* Counter-act map inversion */
+        filter: invert(1) hue-rotate(180deg) brightness(0.7) contrast(1.2); /* Counter-act map inversion */
         overflow: visible !important;
       }
 
@@ -88,6 +87,9 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         letter-spacing: 0.05em;
         z-index: 1;
         pointer-events: none;
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .is-offline .marker-label {

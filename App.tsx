@@ -2093,10 +2093,10 @@ const handleShopSelect = async (shop: Shop) => {
               </div>
 
               <div className="flex-1 space-y-3 min-w-0 flex flex-col">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-1">
-                    <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking tight truncate leading-tight">{activeShop.name}</h3>
-                    <p className="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">{activeShop.cuisine}</p>
+                <div className="flex justify-between items-start gap-4 min-w-0">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight truncate leading-tight">{activeShop.name}</h3>
+                    <p className="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] truncate">{activeShop.cuisine}</p>
                   </div>
                   <div className="shrink-0 pt-1">
                     <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
