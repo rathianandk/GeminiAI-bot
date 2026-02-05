@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
@@ -14,6 +15,7 @@ const AGENTS = [
   { name: 'Linguistic', color: 0xf59e0b, pos: [-1.5, 0.5, 0] },
   { name: 'Historian', color: 0xfacc15, pos: [0, 0.4, 1.2] },
   { name: 'Impact', color: 0x22d3ee, pos: [0, -0.4, -1.2] },
+  { name: 'Healing', color: 0x34d399, pos: [-0.8, 1.2, 0.8] },
 ];
 
 const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeAgent }) => {
@@ -124,7 +126,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       const lineMaterial = new THREE.LineBasicMaterial({ 
         color: agent.color, 
         transparent: true, 
-        opacity: 0.4 // Base opacity increased for brightness
+        opacity: 0.4 
       });
       
       const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -178,10 +180,9 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         }
       });
 
-      // Update Invocation Path Lighting (Brighter Arrows)
+      // Update Invocation Path Lighting
       supervisorLinesRef.current.forEach((line, name) => {
         const isBeingInvoked = name === activeAgentRef.current;
-        // targetOpacity increased: Active is 1.0, Idle is 0.35
         const targetOpacity = isBeingInvoked ? 1.0 : 0.35;
         const targetColor = isBeingInvoked ? 0xffffff : AGENTS.find(a => a.name === name)?.color || 0x6366f1;
 

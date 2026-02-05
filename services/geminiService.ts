@@ -16,11 +16,17 @@ export const fetchLocalWeather = async (location: LatLng) => {
     
     REQUIRED JSON OUTPUT:
     {
-      "temp": "temperature in celsius",
-      "condition": "vivid 1-word condition (e.g. Sunny, Rainy, Humid)",
-      "impactScore": "0-100 score where 100 is perfect for street dining and 0 is prohibitive",
+      "temp": "concise temperature, only numeric value and unit (e.g. 28°C)",
+      "condition": "vivid 1-word condition (e.g. Sunny, Rainy, Humid, Cloudy)",
+      "impactScore": 85,
       "reasoning": "1-sentence spatial impact statement"
-    }`,
+    }
+
+    STRICT RULES:
+    - Do NOT include any source citations, footnotes, or bracketed numbers like [1], [2], or 【source】.
+    - The 'temp' field must be a simple string like '29°C'. Do not add RealFeel or other stats.
+    - The 'condition' field must be exactly one or two words.
+    - Return ONLY valid raw JSON. No preamble.`,
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -35,9 +41,39 @@ export const fetchLocalWeather = async (location: LatLng) => {
       }
     }
   });
+
+  // Aggressive cleaning to strip grounding citations and truncate extra verbiage
+  const clean = (str: any, isTemp: boolean = false) => {
+    if (typeof str !== 'string') return str;
+    // Remove all forms of citations common in grounding
+    let cleaned = str.replace(/\[\d+\]|【.*?】|\(source\)|source|snippet/gi, '').trim();
+    
+    // For temperature, truncate after the first unit to avoid "29°C, 84°F (RealFeel...)"
+    if (isTemp) {
+      const match = cleaned.match(/^\d+°[CF]/i);
+      if (match) return match[0];
+      // Fallback: take part before first comma, paren or space
+      cleaned = cleaned.split(/,|\(|\s/)[0].trim();
+    }
+    
+    return cleaned;
+  };
+
   try {
-    return JSON.parse(response.text || "{\"temp\": \"--°C\", \"condition\": \"Clear\", \"impactScore\": 80, \"reasoning\": \"Climatic data sync pending.\"}");
+    const text = response.text || "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const rawJson = jsonMatch ? jsonMatch[0] : text;
+    
+    const data = JSON.parse(rawJson);
+    
+    return {
+      temp: clean(data.temp, true) || "28°C",
+      condition: clean(data.condition) || "Clear",
+      impactScore: typeof data.impactScore === 'number' ? data.impactScore : 80,
+      reasoning: clean(data.reasoning) || "Local thermal conditions are stable."
+    };
   } catch (e) {
+    console.error("Weather extraction failure:", e);
     return { temp: "28°C", condition: "Clear", impactScore: 80, reasoning: "Local thermal conditions are stable." };
   }
 };
@@ -106,7 +142,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
           "description": "Story", 
           "address": "Address",
           "successReasoning": { "locationGravity": 85, "flavorMoat": 90, "socialResonance": 75, "economicFit": 80 },
-          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe": 95, "nearestPoliceStations": ["Name 1"] },
+          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe: 95, "nearestPoliceStations": ["Name 1"] },
           "urbanLogistics": { "transitAccessibility": 90, "walkabilityScore": 85, "parkingAvailability": 40, "publicTransportNodes": ["Stop A"] },
           "predictedFootfall": [ {"period": "6am-10am", "volume": 40}, {"period": "11am-2pm", "volume": 85}, {"period": "3pm-6pm", "volume": 55}, {"period": "7pm-10pm", "volume": 95}, {"period": "11pm-2am", "volume": 20} ]
         }

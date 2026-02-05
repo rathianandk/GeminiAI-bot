@@ -94,7 +94,7 @@ export interface VendorProfile {
 
 export interface AgentLog {
   id: string;
-  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Impact';
+  agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Impact' | 'Healing';
   message: string;
   status: 'processing' | 'resolved' | 'failed';
 }
