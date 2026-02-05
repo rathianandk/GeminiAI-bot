@@ -135,6 +135,7 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
     2. Flavour Genealogy: Trace the historical spice migration and cultural origin of this dish to the modern street corner using your 1M token context of culinary history.
     3. Nutritional Inference: Estimate Protein (g), Calories (kcal), and Carbs (g).
     4. Spatial Vibe: Detect the "Authenticity Level" (0-100%) based on environment/plating.
+    5. Recommendations: List 2 real legendary shops in Chennai famous for this specific dish.
     
     Return the response in two strictly separated parts:
     
@@ -148,7 +149,8 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
       "calories": "number + kcal", 
       "carbs": "number + g",
       "history_tags": ["tag1", "tag2"], 
-      "authenticity_score": "number%" 
+      "authenticity_score": "number%",
+      "recommended_shops": ["Legendary Shop 1", "Legendary Shop 2"]
     }
     
     STRICT FORMAT: Provide PART A and then PART B as a JSON block.`,
@@ -187,6 +189,7 @@ export const analyzeFoodImage = async (base64Data: string, mimeType: string): Pr
     carbs: "0g", 
     history_tags: [], 
     authenticity_score: "0%", 
+    recommended_shops: [],
     narrative: narrative || "Analysis failed to produce structured data."
   };
 };

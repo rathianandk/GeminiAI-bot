@@ -1679,6 +1679,20 @@ const handleShopSelect = async (shop: Shop) => {
                            </div>
                         </div>
 
+                        {imageFlavorAnalysis.recommended_shops && imageFlavorAnalysis.recommended_shops.length > 0 && (
+                          <div className="space-y-2 mt-4 pt-4 border-t border-amber-500/20">
+                            <p className="text-[9px] font-black text-amber-400 uppercase tracking-[0.3em]">Grid Recommendations</p>
+                            <div className="flex flex-col gap-2">
+                              {imageFlavorAnalysis.recommended_shops.map((shopName, idx) => (
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-black/40 rounded-xl border border-white/5 transition-all hover:bg-white/5 group cursor-default">
+                                  <span className="text-xs group-hover:scale-110 transition-transform">📍</span>
+                                  <span className="text-[11px] font-black text-white uppercase tracking-tight">{shopName}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         <p className="text-[9px] text-amber-300 font-bold italic mt-2 animate-pulse">* Nutritional data is an AI estimate for educational purposes</p>
 
                         <div className="flex flex-wrap gap-2 pt-2">
@@ -2308,7 +2322,7 @@ const handleShopSelect = async (shop: Shop) => {
                 {activeShop.reviews && activeShop.reviews.length > 0 && (
                   <div className="bg-amber-600/10 border border-amber-600/30 px-3 py-1.5 rounded-xl flex items-center justify-center gap-2 shrink-0 w-full">
                     <span className="text-amber-500 text-sm">⭐</span>
-                    <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a, b) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
+                    <span className="text-white font-black text-xs">{(activeShop.reviews.reduce((a: any, b: any) => a + b.rating, 0) / activeShop.reviews.length).toFixed(1)}</span>
                   </div>
                 )}
               </div>

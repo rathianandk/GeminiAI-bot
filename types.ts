@@ -1,3 +1,4 @@
+
 export interface LatLng {
   lat: number;
   lng: number;
@@ -134,6 +135,7 @@ export interface FoodAnalysis {
   history_tags: string[];
   authenticity_score: string;
   narrative: string;
+  recommended_shops?: string[];
   error?: string;
 }
 
