@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Shop, LatLng, GroundingSource, LensAnalysis, SpatialAnalytics, FlavorGenealogy, MenuItem, FoodAnalysis, FootfallPoint } from "../types";
 
@@ -35,24 +36,27 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
   return (response.text || "").trim();
 };
 
+/**
+ * Discovery Agent
+ * Refined to use Gemini 3 Flash Preview with Google Search Grounding to find local nodes.
+ */
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of (${location.lat}, ${location.lng}). 
+    model: "gemini-3-flash-preview",
+    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
     
     INSTRUCTIONS:
-    1. Scan Google Maps and Search for authentic food nodes and safety intelligence.
-    2. For each identified location, provide: Name, precise lat/lng, emoji, cuisine, 1-sentence vivid description, and short address.
-    3. SUCCESS REASONING (successReasoning): Reason about the node's survivability and success based on spatial telemetry.
-       - locationGravity: Score (0-100) based on transit flow and natural urban gravity.
-       - flavorMoat: Score (0-100) based on the uniqueness and irreplacability of the dish/vibe.
-       - socialResonance: Score (0-100) based on social proof, hype velocity, and local legend status.
-       - economicFit: Score (0-100) based on neighborhood demographics vs price points.
-    4. SAFETY ANALYSIS: Reason about local safety metrics and identify exactly the top 3 nearest police station names.
-    5. URBAN LOGISTICS: Reason about Public Transit, Walkability, and Parking. Identify exactly the top 3 nearest public transport nodes.
-    6. FOOTFALL PREDICTION: Provide a predicted footfall volume (0-100) for 5 periods: "6am-10am", "11am-2pm", "3pm-6pm", "7pm-10pm", "11pm-2am".
+    1. Use Google Search to find high-accuracy, real-world data about food spots near this location.
+    2. For each identified location, provide: Name, precise lat/lng coordinates, emoji, cuisine type, a 1-sentence vivid description, and a short address.
+    3. SUCCESS REASONING:
+       - locationGravity: Score (0-100) based on transit flow.
+       - flavorMoat: Score (0-100) based on dish uniqueness.
+       - socialResonance: Score (0-100) based on local legend status.
+       - economicFit: Score (0-100) based on neighborhood demographic match.
+    4. SAFETY & LOGISTICS: Identify the nearest 3 police stations and nearest 3 public transport nodes.
+    5. FOOTFALL PREDICTION: Predicted volume (0-100) for 5 time windows.
     
-    REQUIRED JSON STRUCTURE:
+    REQUIRED JSON STRUCTURE (Output ONLY this raw JSON object):
     {
       "shops": [
         { 
@@ -63,78 +67,37 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
           "cuisine": "Type", 
           "description": "Story", 
           "address": "Address",
-          "successReasoning": {
-            "locationGravity": 85,
-            "flavorMoat": 90,
-            "socialResonance": 75,
-            "economicFit": 80
-          },
-          "safetyMetrics": {
-            "crimeSafety": 85, 
-            "policeProximity": 70, 
-            "footfallIntensity": 90, 
-            "lighting": 80, 
-            "vibe": 95,
-            "nearestPoliceStations": ["Station Name 1", "Station Name 2"]
-          },
-          "urbanLogistics": {
-            "transitAccessibility": 90,
-            "walkabilityScore": 85,
-            "parkingAvailability": 40,
-            "publicTransportNodes": ["Bus Stop A", "Metro Station B"]
-          },
-          "predictedFootfall": [
-            {"period": "6am-10am", "volume": 40},
-            {"period": "11am-2pm", "volume": 85},
-            {"period": "3pm-6pm", "volume": 55},
-            {"period": "7pm-10pm", "volume": 95},
-            {"period": "11pm-2am", "volume": 20}
-          ]
+          "successReasoning": { "locationGravity": 85, "flavorMoat": 90, "socialResonance": 75, "economicFit": 80 },
+          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe": 95, "nearestPoliceStations": ["Name 1"] },
+          "urbanLogistics": { "transitAccessibility": 90, "walkabilityScore": 85, "parkingAvailability": 40, "publicTransportNodes": ["Stop A"] },
+          "predictedFootfall": [ {"period": "6am-10am", "volume": 40}, {"period": "11am-2pm", "volume": 85}, {"period": "3pm-6pm", "volume": 55}, {"period": "7pm-10pm", "volume": 95}, {"period": "11pm-2am", "volume": 20} ]
         }
       ],
-      "logs": [
-        "Internal step 1 summary...",
-        "Internal step 2 summary..."
-      ]
-    }
-    
-    CRITICAL: Output ONLY the raw JSON object. Do not include markdown formatting.`,
+      "logs": ["Step 1: Scanned coordinates.", "Step 2: Filtered for flavor legend status."]
+    }`,
     config: {
-      tools: [{ googleMaps: {} }, { googleSearch: {} }],
-      toolConfig: {
-        retrievalConfig: {
-          latLng: {
-            latitude: location.lat,
-            longitude: location.lng
-          }
-        }
-      }
+      tools: [{ googleSearch: {} }]
     }
   });
 
   const text = (response.text || "").trim();
   let data: { shops?: any[], logs?: string[] } = { shops: [], logs: [] };
   
-  if (!text) {
-    return { shops: [], logs: ["Discovery signal timeout. Check connectivity."], sources: [] };
-  }
-
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       data = JSON.parse(jsonMatch[0]);
     } else {
-      data.logs = [`No structured JSON found in telemetry. Response: ${text.substring(0, 100)}...`];
+      data.logs = ["Search grounding active but failed to return structured results."];
     }
   } catch (e) {
-    console.error("Discovery Parse Error:", e, text);
-    data.logs = ["Data corruption in spatial stream. Parsing failed."];
-    data.shops = [];
+    console.error("Discovery Parse Error:", e);
+    data.logs = ["Telemetry corruption detected in search result stream."];
   }
 
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const sources: GroundingSource[] = groundingChunks.map((c: any) => ({
-    title: c.web?.title || c.maps?.title || "Reference Node",
+    title: c.web?.title || c.maps?.title || "Verification Link",
     uri: c.web?.uri || c.maps?.uri || "#"
   }));
 
@@ -146,18 +109,10 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
     successReasoning: s.successReasoning || { locationGravity: 70, flavorMoat: 70, socialResonance: 70, economicFit: 70 },
     safetyMetrics: s.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
     urbanLogistics: s.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
-    predictedFootfall: s.predictedFootfall || [
-      { period: "6am-10am", volume: 30 },
-      { period: "11am-2pm", volume: 70 },
-      { period: "3pm-6pm", volume: 50 },
-      { period: "7pm-10pm", volume: 85 },
-      { period: "11pm-2am", volume: 15 }
-    ]
+    predictedFootfall: s.predictedFootfall || [{ period: "Lunch", volume: 70 }]
   }));
 
-  const resultLogs = (data.logs && data.logs.length > 0) ? data.logs : ["Grid scan successful. Visualizing nodes."];
-
-  return { shops: sanitizedShops as Shop[], logs: resultLogs as string[], sources };
+  return { shops: sanitizedShops as Shop[], logs: (data.logs || ["Sector scanned via Search Grounding."]) as string[], sources };
 };
 
 export const analyzeFoodImage = async (base64Data: string, mimeType: string): Promise<FoodAnalysis> => {
@@ -312,22 +267,7 @@ export const generateSpatialAnalytics = async (shops: Shop[]): Promise<SpatialAn
 export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGenealogy> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
-    contents: `MISSION: CROSS-TEMPORAL FLAVOR REASONING for location (${location.lat}, ${location.lng}).
-    
-    SIMULATE DEEP REASONING OVER 1M+ TOKENS OF HISTORICAL ARCHIVES:
-    - Pre-colonial staples (fermented batter, steamed foods).
-    - 18th-century spice trade records and colonial manifests.
-    - 20th-century post-war culinary migration and displacement recipes.
-    - Modern 21st-century tech-sector globalized fusion data.
-    
-    ANALYZE:
-    1. How dominant flavors (Spicy, Tangy, Sweet, Pungent) evolved over centuries in this exact neighborhood.
-    2. Local favorites and the "Soul" of the area's food history.
-    3. CRITICAL: For Chennai-based coordinates, prioritize foundational staples like IDLY (fermented steamed food) and coastal seafood/fish culture (e.g. Marina Beach influence).
-    4. Distinct eras with specific flavor profiles and context.
-    5. For each era, identify EXACTLY 3 iconic popular food items that define that period in this location.
-    
-    RETURN RAW JSON.`,
+    contents: `MISSION: CROSS-TEMPORAL FLAVOR REASONING for location (${location.lat}, ${location.lng}). Trace the historical staples, spice migration, and icons across eras.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -361,20 +301,7 @@ export const getFlavorGenealogy = async (location: LatLng): Promise<FlavorGeneal
 export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `EXTRACT ORDER ITEMS FROM USER INPUT.
-    
-    USER INPUT: "${userInput}"
-    SHOP MENU: ${JSON.stringify(menu)}
-    
-    INSTRUCTIONS:
-    1. Identify ONLY the items mentioned in the LATEST USER INPUT provided above. Do NOT include items from previous context.
-    2. Support English and Tamil.
-    3. Tamil quantity mappings: "onnu/onru" = 1, "rendu" = 2, "moonu" = 3, "naalu" = 4, "anju" = 5, "aaru" = 6, "ezhu" = 7, "ettu" = 8, "onbadhu" = 9, "pathu" = 10.
-    4. Map Tamil pronunciations to English menu names (e.g. "biryani" -> "Mutton Biryani" if that's the closest match).
-    5. If an item name is vague, pick the best match from the menu.
-    6. Return a list of items and their individual counts.
-    
-    RETURN RAW JSON matching the responseSchema.`,
+    contents: `Extract order: "${userInput}" from Menu: ${JSON.stringify(menu)}. Map Tamil counts to numbers.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -404,23 +331,7 @@ export const parseOrderAgent = async (userInput: string, menu: MenuItem[]) => {
 export const spatialLensAnalysis = async (location: LatLng, shopName: string): Promise<LensAnalysis> => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `MISSION: 'Lens Mode' Intensive Spatial Intelligence Scrape for "${shopName}" at (${location.lat}, ${location.lng}).
-    
-    TASK:
-    1. Use Google Search to find accurate spatial and visual details for this establishment. 
-    2. Specifically, determine if it is a street cart, a rooftop venue (like La Cabana in Nungambakkam), or an indoor eatery.
-    3. Analyze the urban integration:
-       - If rooftop: Focus on panoramic visibility, structural elevation, and "Sky-Dining" flow.
-       - If street stall: Focus on sidewalk proxemics, tree shade integration, and cart efficiency.
-       - If indoor: Focus on interior zoning and entrance/boundary management.
-    
-    Return a JSON object with:
-    - "observations": Array of 10-15 detailed LensObservation objects grounding the establishment in its real layout.
-    - "extractedFrames": Array of 5-8 LensFrame objects (vivid descriptions of what a camera sees at the location).
-    - "recommendation": A synthesized urban planning/spatial strategy.
-    - "videoSource": Link to a relevant visual reference (e.g. @RollingSirrr or restaurant's official tour).
-    
-    IMPORTANT: Provide ONLY high-precision observations. Ground the response in real Google Search data for "${shopName}". Return ONLY raw JSON.`,
+    contents: `MISSION: 'Lens Mode' Intensive Spatial Intelligence Scrape for "${shopName}" at (${location.lat}, ${location.lng}). Ground observations in real visual layout details.`,
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -436,13 +347,12 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
                 type: { type: Type.STRING },
                 detail: { type: Type.STRING },
                 causalBottleneck: { type: Type.STRING }
-              },
-              required: ["id", "type", "detail", "causalBottleneck"]
+              }
             } 
           },
           extractedFrames: {
-            type: Type.ARRAY,
-            items: {
+            type: Type.ARRAY, 
+            items: { 
               type: Type.OBJECT,
               properties: {
                 id: { type: Type.STRING },
@@ -450,14 +360,12 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
                 description: { type: Type.STRING },
                 category: { type: Type.STRING },
                 spatialInsight: { type: Type.STRING }
-              },
-              required: ["id", "timestamp", "description", "category", "spatialInsight"]
+              }
             }
           },
           recommendation: { type: Type.STRING },
           videoSource: { type: Type.STRING }
-        },
-        required: ["observations", "extractedFrames", "recommendation", "videoSource"]
+        }
       }
     }
   });
@@ -468,7 +376,7 @@ export const spatialLensAnalysis = async (location: LatLng, shopName: string): P
 export const getTamilTextSummary = async (shop: Shop) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Write a hyper-local, enthusiastic summary of ${shop.name} (${shop.cuisine}) in both Tamil and English. Focus on the vibe and why people love it. Use street slang like 'Machi' and 'Veralevel'.`,
+    contents: `Write a summary of ${shop.name} in Tamil and English as JSON { "tamil": "...", "english": "..." }.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -499,20 +407,19 @@ export const getTamilAudioSummary = async (shop: Shop) => {
 export const generateVendorBio = async (name: string, cuisine: string) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `Create a punchy, short 2-sentence marketing bio for a street food vendor named "${name}" who sells "${cuisine}".`,
+    contents: `Bio for ${name} selling ${cuisine}.`,
   });
   return (response.text || "").trim();
 };
 
 export const spatialAlertAgent = async (vendorName: string, location: LatLng) => {
-  const prompt = `A street food vendor named "${vendorName}" has just gone LIVE at lat ${location.lat}, lng ${location.lng}. Create a localized broadcast message in Tamil.`;
   const textResponse = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: prompt,
+    contents: `Vendor ${vendorName} live at ${location.lat}, ${location.lng}.`,
   });
   const audioResponse = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Say excitedly: ${textResponse.text}` }] }],
+    contents: [{ parts: [{ text: `Excitedly: ${textResponse.text}` }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } } }
@@ -527,7 +434,7 @@ export const spatialAlertAgent = async (vendorName: string, location: LatLng) =>
 export const spatialChatAgent = async (message: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: `User location: ${location.lat}, ${location.lng}. Inquiry: ${message}. Respond based on real-time spatial data.`,
+    contents: `User location: ${location.lat}, ${location.lng}. Inquiry: ${message}.`,
     config: { 
       tools: [{ googleMaps: {} }, { googleSearch: {} }],
       toolConfig: {
@@ -542,7 +449,7 @@ export const spatialChatAgent = async (message: string, location: LatLng) => {
   });
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const sources: GroundingSource[] = groundingChunks.map((c: any) => ({
-    title: c.web?.title || c.maps?.title || "Spatial Node",
+    title: c.web?.title || c.maps?.title || "Verification Source",
     uri: c.web?.uri || c.maps?.uri || "#"
   }));
   return { text: response.text || "", sources };
