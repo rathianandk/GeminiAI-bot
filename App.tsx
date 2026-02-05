@@ -419,7 +419,198 @@ const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
     </div>
   );
 };
+// --- Data Synergy Matrix Component ---
+// REFACTORED: Use high-fidelity CSS Grid instead of Chart.js "matrix" controller to fix registration error
+const DataSynergyMatrix = ({ 
+  shop,
+  metrics 
+}: { 
+  shop: Shop | null,
+  metrics?: {
+    safetyScore: number;
+    logisticsScore: number; 
+    successScore: number;
+    footfallScore: number;
+  }
+}) => {
+  if (!shop) return null;
 
+  // Aggregate metrics with robust fallback reasoning
+  const safety = shop.safetyMetrics;
+  const logistics = shop.urbanLogistics;
+  const success = shop.successReasoning;
+  
+  const sScore = metrics?.safetyScore ?? Math.round(
+    ((safety?.crimeSafety || 70) + 
+     (safety?.policeProximity || 70) + 
+     (safety?.lighting || 70)) / 3
+  );
+  
+  const lScore = metrics?.logisticsScore ?? Math.round(
+    ((logistics?.transitAccessibility || 50) + 
+     (logistics?.walkabilityScore || 50) + 
+     (logistics?.parkingAvailability || 50)) / 3
+  );
+  
+  const suScore = metrics?.successScore ?? Math.round(
+    ((success?.locationGravity || 70) + 
+     (success?.flavorMoat || 70)) / 2
+  );
+  
+  const fScore = metrics?.footfallScore ?? (
+    shop.predictedFootfall && shop.predictedFootfall.length > 0 
+      ? Math.round(
+          shop.predictedFootfall.reduce((a, b) => a + b.volume, 0) / 
+          shop.predictedFootfall.length
+        )
+      : 50
+  );
+
+  const labels = ['Safety', 'Logi', 'Succ', 'Foot'];
+  const values = [sScore, lScore, suScore, fScore];
+  
+  const getSynergy = (v1: number, v2: number): number => {
+    return Math.round((v1 * v2) / 100);
+  };
+
+  const getCellStyle = (value: number) => {
+    if (value >= 80) {
+      return {
+        bg: 'bg-emerald-500/30',
+        text: 'text-emerald-400'
+      };
+    } else if (value >= 60) {
+      return {
+        bg: 'bg-amber-500/30',
+        text: 'text-amber-400'
+      };
+    } else if (value >= 40) {
+      return {
+        bg: 'bg-rose-500/30',
+        text: 'text-rose-400'
+      };
+    } else {
+      return {
+        bg: 'bg-white/5',
+        text: 'text-white/20'
+      };
+    }
+  };
+
+  return (
+    <div className="p-6 bg-gradient-to-br from-purple-600/5 to-pink-600/5 border border-purple-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
+      <p className="text-[10px] font-black text-purple-300 uppercase tracking-[0.4em] text-center border-b border-purple-500/10 pb-4">
+        Diagnostic Synergy Matrix
+      </p>
+      
+      {/* Matrix Grid */}
+      <div className="grid grid-cols-5 gap-2 px-1">
+        {/* Empty top-left cell */}
+        <div className="h-8"></div>
+        
+        {/* Column headers */}
+        {labels.map((label, index) => (
+          <div key={`col-${index}`} className="flex items-center justify-center h-8">
+            <span className="text-[6px] font-black text-white/30 uppercase">
+              {label}
+            </span>
+          </div>
+        ))}
+
+        {/* Matrix rows */}
+        {labels.map((rowLabel, rowIndex) => (
+          <React.Fragment key={`row-${rowIndex}`}>
+            {/* Row label */}
+            <div className="flex items-center justify-end pr-2 h-10">
+              <span className="text-[6px] font-black text-white/30 uppercase text-right leading-tight">
+                {rowLabel}
+              </span>
+            </div>
+            
+            {/* Matrix cells */}
+            {labels.map((colLabel, colIndex) => {
+              const value = getSynergy(values[rowIndex], values[colIndex]);
+              const style = getCellStyle(value);
+              
+              return (
+                <div 
+                  key={`cell-${rowIndex}-${colIndex}`}
+                  className={`
+                    h-10 rounded-lg flex items-center justify-center 
+                    text-[8px] font-black border border-white/5 
+                    ${style.bg} ${style.text} 
+                    transition-all hover:scale-110 cursor-help shadow-inner
+                  `}
+                  title={`${labels[rowIndex]} ↔ ${labels[colIndex]}: ${value}% synergy`}
+                >
+                  {value}%
+                </div>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Score Summary */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+          <p className="text-[7px] font-black text-purple-400 uppercase tracking-widest mb-1">
+            Safety Index
+          </p>
+          <p className="text-[14px] font-black text-white">{sScore}%</p>
+        </div>
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <p className="text-[7px] font-black text-emerald-400 uppercase tracking-widest mb-1">
+            Logistics
+          </p>
+          <p className="text-[14px] font-black text-white">{lScore}%</p>
+        </div>
+        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+          <p className="text-[7px] font-black text-amber-400 uppercase tracking-widest mb-1">
+            Success
+          </p>
+          <p className="text-[14px] font-black text-white">{suScore}%</p>
+        </div>
+        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+          <p className="text-[7px] font-black text-rose-400 uppercase tracking-widest mb-1">
+            Footfall
+          </p>
+          <p className="text-[14px] font-black text-white">{fScore}%</p>
+        </div>
+      </div>
+
+      {/* Synergy Insights */}
+      <div className="space-y-3 pt-2">
+        <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest px-2">
+          Key Synergies
+        </p>
+        <div className="space-y-2">
+          {[
+            { pair: 'Safety ↔ Logistics', synergy: getSynergy(sScore, lScore) },
+            { pair: 'Success ↔ Footfall', synergy: getSynergy(suScore, fScore) },
+            { pair: 'Safety ↔ Success', synergy: getSynergy(sScore, suScore) }
+          ].map((insight, index) => (
+            <div key={index} className="flex items-center justify-between p-2 bg-black/30 rounded-lg border border-white/5">
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black text-white uppercase truncate">
+                  {insight.pair}
+                </p>
+              </div>
+              <div className={`
+                px-2 py-1 rounded-md text-[9px] font-black
+                ${insight.synergy >= 70 ? 'bg-emerald-500/20 text-emerald-400' :
+                  insight.synergy >= 50 ? 'bg-amber-500/20 text-amber-400' :
+                  'bg-rose-500/20 text-rose-400'}
+              `}>
+                {insight.synergy}%
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 // --- Progress Indicator Component ---
 const MetricBar = ({ label, value, colorClass, textColorClass, glowClass }: { label: string, value: number, colorClass: string, textColorClass: string, glowClass: string }) => {
   return (
@@ -1805,6 +1996,33 @@ const handleShopSelect = async (shop: Shop) => {
                               <p className="text-[8px] text-rose-300/95 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}
+                             {lensShopData && (
+          <DataSynergyMatrix 
+            shop={lensShopData}
+            metrics={{
+              safetyScore: Math.round(
+                (lensShopData.safetyMetrics.crimeSafety + 
+                 lensShopData.safetyMetrics.policeProximity + 
+                 lensShopData.safetyMetrics.lighting) / 3
+              ),
+              logisticsScore: Math.round(
+                (lensShopData.urbanLogistics.transitAccessibility + 
+                 lensShopData.urbanLogistics.walkabilityScore + 
+                 lensShopData.urbanLogistics.parkingAvailability) / 3
+              ),
+              successScore: Math.round(
+                (lensShopData.successReasoning.locationGravity + 
+                 lensShopData.successReasoning.flavorMoat + 
+                 lensShopData.successReasoning.socialResonance + 
+                 lensShopData.successReasoning.economicFit) / 4
+              ),
+              footfallScore: Math.round(
+                lensShopData.predictedFootfall.reduce((sum, period) => sum + period.volume, 0) / 
+                lensShopData.predictedFootfall.length
+              )
+            }}
+          />
+        )}
                         </div>
                       ) : (
                         <div className="py-20 text-center opacity-20">
