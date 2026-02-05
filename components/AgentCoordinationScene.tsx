@@ -5,9 +5,6 @@ interface AgentCoordinationSceneProps {
   activeAgent: string | null;
 }
 
-/**
- * Procedural Agent definitions with their spatial positions in the coordination mesh.
- */
 const AGENTS = [
   { name: 'Supervisor', color: 0xffffff, pos: [0, 0, 0], isSupervisor: true },
   { name: 'Spatial', color: 0x6366f1, pos: [0, 1.6, 0] },
@@ -19,10 +16,6 @@ const AGENTS = [
   { name: 'Impact', color: 0x22d3ee, pos: [0, -0.4, -1.2] },
 ];
 
-/**
- * Three.js Visualization Scene
- * Renders a reactive 3D neural mesh representing the autonomous agent coordination loop.
- */
 const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeAgent }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -31,14 +24,10 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
   const supervisorLinesRef = useRef<Map<string, THREE.Line>>(new Map());
   const activeAgentRef = useRef<string | null>(null);
 
-  // Sync prop to ref for usage within the procedural animation loop
   useEffect(() => {
     activeAgentRef.current = activeAgent;
   }, [activeAgent]);
 
-  /**
-   * Generates a dynamic 2D canvas sprite for agent naming.
-   */
   const createTextLabel = (text: string, color: number) => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -92,9 +81,8 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
     pointLight.position.set(5, 5, 5);
     scene.add(pointLight);
 
-    // Initial procedural node construction
+    // Create Nodes
     AGENTS.forEach((agent) => {
-      // Supervisor gets a unique geometric signature
       const geometry = agent.isSupervisor 
         ? new THREE.OctahedronGeometry(0.22) 
         : new THREE.SphereGeometry(0.16, 32, 32);
@@ -111,7 +99,6 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       scene.add(mesh);
       nodesRef.current.set(agent.name, mesh);
 
-      // Aesthetic outer ring
       const ringGeo = new THREE.RingGeometry(0.24, 0.28, 32);
       const ringMat = new THREE.MeshBasicMaterial({ 
         color: agent.color, 
@@ -129,7 +116,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       labelsRef.current.set(agent.name, label);
     });
 
-    // Central Supervisor connections
+    // Neural Web Connections (Supervisor Arrows)
     const supervisor = AGENTS.find(a => a.isSupervisor)!;
     AGENTS.forEach(agent => {
       if (agent === supervisor) return;
@@ -137,7 +124,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       const lineMaterial = new THREE.LineBasicMaterial({ 
         color: agent.color, 
         transparent: true, 
-        opacity: 0.4 
+        opacity: 0.4 // Base opacity increased for brightness
       });
       
       const geometry = new THREE.BufferGeometry().setFromPoints([
@@ -149,7 +136,7 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       supervisorLinesRef.current.set(agent.name, line);
     });
 
-    // Mesh Inter-node connections (neighbor mapping)
+    // Mesh Ring Connections
     const outerAgents = AGENTS.filter(a => !a.isSupervisor);
     for (let i = 0; i < outerAgents.length; i++) {
       for (let j = i + 1; j < outerAgents.length; j++) {
@@ -173,7 +160,6 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         const isActive = name === activeAgentRef.current;
         const isSupervisor = name === 'Supervisor';
         
-        // Dynamic scaling based on activity
         let targetScale = 1.0;
         if (isActive) {
           targetScale = 1.6 + Math.sin(Date.now() * 0.01) * 0.2;
@@ -185,7 +171,6 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         
         mesh.scale.setScalar(THREE.MathUtils.lerp(mesh.scale.x, targetScale, 0.1));
         
-        // Reactive emissive intensity
         if (mesh.material instanceof THREE.MeshPhongMaterial) {
            const baseIntensity = isSupervisor ? 0.6 : 0.2;
            const targetIntensity = isActive ? 1.8 + Math.sin(Date.now() * 0.02) * 0.6 : baseIntensity;
@@ -193,9 +178,10 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         }
       });
 
-      // Lighting and visibility for active invocation paths
+      // Update Invocation Path Lighting (Brighter Arrows)
       supervisorLinesRef.current.forEach((line, name) => {
         const isBeingInvoked = name === activeAgentRef.current;
+        // targetOpacity increased: Active is 1.0, Idle is 0.35
         const targetOpacity = isBeingInvoked ? 1.0 : 0.35;
         const targetColor = isBeingInvoked ? 0xffffff : AGENTS.find(a => a.name === name)?.color || 0x6366f1;
 
@@ -214,7 +200,6 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
         }
       });
 
-      // Subtle scene-wide drift
       scene.rotation.y += 0.003;
       scene.rotation.x = Math.sin(Date.now() * 0.0004) * 0.08;
 

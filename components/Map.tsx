@@ -8,34 +8,26 @@ interface MapProps {
   onShopClick: (shop: Shop) => void;
 }
 
-// External global Leaflet object
 declare const L: any;
 
-/**
- * Spatial Discovery Map Component
- * Integrates Leaflet with custom CSS-driven markers to represent street food nodes.
- */
 const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick }) => {
   const mapRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
   const shopMarkersGroupRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Map on mount
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    // Setup map with minimal controls for a dashboard feel
     mapRef.current = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false
     }).setView([center.lat, center.lng], 13);
 
-    // Using CartoDB Voyager tiles for a clean, non-distracting background
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapRef.current);
     shopMarkersGroupRef.current = L.layerGroup().addTo(mapRef.current);
 
-    // Global CSS for custom Marker Truck badges
+    // Global style for markers - Truck Icon Design
     const style = document.createElement('style');
     style.innerHTML = `
       @keyframes pinDrop {
@@ -49,7 +41,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         flex-direction: column;
         align-items: center;
         animation: pinDrop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        filter: invert(1) hue-rotate(180deg) brightness(0.7) contrast(1.2); /* UI compensation for global map filter */
+        filter: invert(1) hue-rotate(180deg) brightness(0.7) contrast(1.2); /* Counter-act map inversion */
         overflow: visible !important;
       }
 
@@ -72,6 +64,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
+      /* Truck SVG Styling */
       .truck-svg {
         width: 30px;
         height: 30px;
@@ -80,11 +73,11 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
 
       .marker-label {
         margin-top: 6px;
-        background: rgba(15, 23, 42, 0.9);
+        background: rgba(15, 23, 42, 0.9); /* Dark background */
         padding: 5px 14px;
         border-radius: 10px;
-        border: 1px solid #6366F1;
-        color: #F8FAFC;
+        border: 1px solid #6366F1; /* Neon Indigo Border */
+        color: #F8FAFC; /* Bright Text */
         font-weight: 800;
         font-size: 11px;
         white-space: nowrap;
@@ -105,6 +98,7 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         background: rgba(30, 41, 59, 0.8);
       }
 
+      /* Hover States */
       .custom-marker-container:hover .marker-truck-badge {
         transform: scale(1.2) translateY(-4px);
         box-shadow: 0 8px 20px rgba(0,0,0,0.6), 0 0 25px rgba(59, 130, 246, 0.5);
@@ -114,8 +108,10 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
         background: #1E293B;
         border-color: #818CF8;
         color: #FFFFFF;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 15px rgba(129, 140, 248, 0.4);
       }
 
+      /* User Marker Pulse */
       .user-marker-dot {
         background: #6366F1;
         width: 20px;
@@ -128,7 +124,6 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
     `;
     document.head.appendChild(style);
 
-    // Draggable user location marker
     userMarkerRef.current = L.marker([center.lat, center.lng], { 
       draggable: true,
       zIndexOffset: 1000,
@@ -140,13 +135,11 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
       })
     }).addTo(mapRef.current);
 
-    // Sync drag events back to state
     userMarkerRef.current.on('dragend', () => {
       const pos = userMarkerRef.current.getLatLng();
       onLocationChange({ lat: pos.lat, lng: pos.lng });
     });
 
-    // Handle clicks on map to reposition user marker
     mapRef.current.on('click', (e: any) => {
       const pos = e.latlng;
       userMarkerRef.current.setLatLng(pos);
@@ -161,7 +154,6 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
     };
   }, []);
 
-  // Update shop markers when the list changes
   useEffect(() => {
     if (!mapRef.current || !shopMarkersGroupRef.current) return;
     shopMarkersGroupRef.current.clearLayers();
@@ -171,14 +163,13 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
       const isVendorOffline = shop.isVendor && shop.status === VendorStatus.OFFLINE;
       const isAIsync = shop.id.startsWith('sync');
       
-      // Color-coding based on node status
-      let truckColor = '#6366F1'; 
+      let truckColor = '#6366F1'; // Default Indigo
       if (isOnline) {
-        truckColor = '#10B981'; 
+        truckColor = '#10B981'; // Live Green
       } else if (isVendorOffline) {
-        truckColor = '#475569'; 
+        truckColor = '#475569'; // Offline Gray
       } else if (isAIsync) {
-        truckColor = '#D946EF'; 
+        truckColor = '#D946EF'; // AI Pink/Magenta
       }
 
       const truckSvg = `
@@ -214,7 +205,6 @@ const Map: React.FC<MapProps> = ({ center, shops, onLocationChange, onShopClick 
     });
   }, [shops]);
 
-  // Dynamic flying transition when center state changes externally
   useEffect(() => {
     if (mapRef.current && center) {
       const mapCenter = mapRef.current.getCenter();

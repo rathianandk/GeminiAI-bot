@@ -1,22 +1,13 @@
-/**
- * Geo-coordinates representation
- */
 export interface LatLng {
   lat: number;
   lng: number;
 }
 
-/**
- * Status of a street vendor node on the grid
- */
 export enum VendorStatus {
   ONLINE = 'online',
   OFFLINE = 'offline',
 }
 
-/**
- * User-submitted review entity
- */
 export interface Review {
   id: string;
   author: string;
@@ -25,18 +16,12 @@ export interface Review {
   timestamp: string;
 }
 
-/**
- * Inventory item for a vendor node
- */
 export interface MenuItem {
   name: string;
   price: number;
   isSoldOut?: boolean;
 }
 
-/**
- * Intelligence metrics regarding location safety
- */
 export interface SafetyMetrics {
   crimeSafety: number;
   policeProximity: number;
@@ -46,9 +31,6 @@ export interface SafetyMetrics {
   nearestPoliceStations?: string[];
 }
 
-/**
- * Logistics data for urban accessibility
- */
 export interface UrbanLogistics {
   transitAccessibility: number;
   walkabilityScore: number;
@@ -56,17 +38,11 @@ export interface UrbanLogistics {
   publicTransportNodes?: string[];
 }
 
-/**
- * Individual point for footfall trend charts
- */
 export interface FootfallPoint {
   period: string;
   volume: number;
 }
 
-/**
- * AI-reasoned success indicators for a food node
- */
 export interface SuccessReasoning {
   locationGravity: number;
   flavorMoat: number;
@@ -74,9 +50,6 @@ export interface SuccessReasoning {
   economicFit: number;
 }
 
-/**
- * Core shop/stall entity used by the Map and UI
- */
 export interface Shop {
   id: string;
   name: string;
@@ -95,13 +68,10 @@ export interface Shop {
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
   successReasoning?: SuccessReasoning;
-  // hygieneScore supports vendor node reporting and quality tracking
+  // Added hygieneScore to support vendor node reporting
   hygieneScore?: number;
 }
 
-/**
- * Extended profile for registered partner nodes
- */
 export interface VendorProfile {
   id: string;
   name: string;
@@ -117,12 +87,10 @@ export interface VendorProfile {
   urbanLogistics?: UrbanLogistics;
   predictedFootfall?: FootfallPoint[];
   successReasoning?: SuccessReasoning;
+  // Added hygieneScore to support management of partner nodes
   hygieneScore?: number;
 }
 
-/**
- * Log entry for autonomous agent activities
- */
 export interface AgentLog {
   id: string;
   agent: 'Discovery' | 'Linguistic' | 'Spatial' | 'Lens' | 'Analytics' | 'Historian' | 'Impact';
@@ -130,9 +98,6 @@ export interface AgentLog {
   status: 'processing' | 'resolved' | 'failed';
 }
 
-/**
- * Chat message entity for the voice/text interface
- */
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -141,17 +106,11 @@ export interface ChatMessage {
   sources?: GroundingSource[];
 }
 
-/**
- * Grounding reference from Google Search/Maps
- */
 export interface GroundingSource {
   title: string;
   uri: string;
 }
 
-/**
- * Visual observation from the Lens agent
- */
 export interface LensObservation {
   id: string;
   type: 'bottleneck' | 'flow' | 'friction' | 'opportunity';
@@ -159,9 +118,6 @@ export interface LensObservation {
   causalBottleneck: string;
 }
 
-/**
- * Extracted frame metadata from visual scraping
- */
 export interface LensFrame {
   id: string;
   timestamp: string;
@@ -170,9 +126,6 @@ export interface LensFrame {
   spatialInsight: string;
 }
 
-/**
- * Deep food analysis from Lens image mining
- */
 export interface FoodAnalysis {
   name: string;
   protein: string;
@@ -184,9 +137,6 @@ export interface FoodAnalysis {
   error?: string;
 }
 
-/**
- * Complete synthesis of Lens activity
- */
 export interface LensAnalysis {
   observations: LensObservation[];
   extractedFrames: LensFrame[];
@@ -195,9 +145,6 @@ export interface LensAnalysis {
   foodAnalysis?: FoodAnalysis;
 }
 
-/**
- * High-level analytics dashboard state
- */
 export interface SpatialAnalytics {
   cuisineDistribution: { label: string; count: number; percentage: number }[];
   priceSpectrum: { range: string; nodes: string[] }[];
@@ -206,9 +153,6 @@ export interface SpatialAnalytics {
   sectorSummary: string;
 }
 
-/**
- * Contextual era for Flavor Genealogy
- */
 export interface FlavorEra {
   period: string;
   profile: string;
@@ -218,9 +162,6 @@ export interface FlavorEra {
   historicalContext: string;
 }
 
-/**
- * Complete temporal analysis of a neighborhood's food culture
- */
 export interface FlavorGenealogy {
   neighborhood: string;
   timeline: FlavorEra[];
