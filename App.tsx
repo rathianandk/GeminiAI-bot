@@ -17,7 +17,8 @@ import {
   getFlavorGenealogy,
   parseOrderAgent,
   predictFootfallAgent,
-  analyzeFoodImage
+  analyzeFoodImage,
+  fetchLocalWeather
 } from './services/geminiService';
 import { 
   Shop, 
@@ -424,9 +425,11 @@ const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
 // REFACTORED: Use high-fidelity CSS Grid instead of Chart.js "matrix" controller to fix registration error
 const DataSynergyMatrix = ({ 
   shop,
+  weather,
   metrics 
 }: { 
   shop: Shop | null,
+  weather: any | null,
   metrics?: {
     safetyScore: number;
     logisticsScore: number; 
@@ -443,61 +446,26 @@ const DataSynergyMatrix = ({
   const logistics = shop.urbanLogistics;
   const success = shop.successReasoning;
   
-  const sScore = metrics?.safetyScore ?? Math.round(
-    ((safety?.crimeSafety || 70) + 
-     (safety?.policeProximity || 70) + 
-     (safety?.lighting || 70)) / 3
-  );
+  const sScore = metrics?.safetyScore ?? Math.round(((safety?.crimeSafety || 70) + (safety?.policeProximity || 70) + (safety?.lighting || 70)) / 3);
+  const lScore = metrics?.logisticsScore ?? Math.round(((logistics?.transitAccessibility || 50) + (logistics?.walkabilityScore || 50) + (logistics?.parkingAvailability || 50)) / 3);
+  const suScore = metrics?.successScore ?? Math.round(((success?.locationGravity || 70) + (success?.flavorMoat || 70)) / 2);
+  const fScore = metrics?.footfallScore ?? (shop.predictedFootfall && shop.predictedFootfall.length > 0 ? Math.round(shop.predictedFootfall.reduce((a, b) => a + b.volume, 0) / shop.predictedFootfall.length) : 50);
   
-  const lScore = metrics?.logisticsScore ?? Math.round(
-    ((logistics?.transitAccessibility || 50) + 
-     (logistics?.walkabilityScore || 50) + 
-     (logistics?.parkingAvailability || 50)) / 3
-  );
-  
-  const suScore = metrics?.successScore ?? Math.round(
-    ((success?.locationGravity || 70) + 
-     (success?.flavorMoat || 70)) / 2
-  );
-  
-  const fScore = metrics?.footfallScore ?? (
-    shop.predictedFootfall && shop.predictedFootfall.length > 0 
-      ? Math.round(
-          shop.predictedFootfall.reduce((a, b) => a + b.volume, 0) / 
-          shop.predictedFootfall.length
-        )
-      : 50
-  );
+  // NEW: Integrate Weather Score
+  const wScore = weather?.impactScore ?? 80;
 
-  const labels = ['Safety', 'Logi', 'Succ', 'Foot'];
-  const values = [sScore, lScore, suScore, fScore];
+  const labels = ['Safety', 'Logi', 'Succ', 'Foot', 'Clim'];
+  const values = [sScore, lScore, suScore, fScore, wScore];
   
   const getSynergy = (v1: number, v2: number): number => {
     return Math.round((v1 * v2) / 100);
   };
 
   const getCellStyle = (value: number) => {
-    if (value >= 80) {
-      return {
-        bg: 'bg-emerald-500/30',
-        text: 'text-emerald-400'
-      };
-    } else if (value >= 60) {
-      return {
-        bg: 'bg-amber-500/30',
-        text: 'text-amber-400'
-      };
-    } else if (value >= 40) {
-      return {
-        bg: 'bg-rose-500/30',
-        text: 'text-rose-400'
-      };
-    } else {
-      return {
-        bg: 'bg-white/5',
-        text: 'text-white/20'
-      };
-    }
+    if (value >= 80) return { bg: 'bg-emerald-500/30', text: 'text-emerald-400' };
+    if (value >= 60) return { bg: 'bg-amber-500/30', text: 'text-amber-400' };
+    if (value >= 40) return { bg: 'bg-rose-500/30', text: 'text-rose-400' };
+    return { bg: 'bg-white/5', text: 'text-white/20' };
   };
 
   return (
@@ -517,47 +485,28 @@ const DataSynergyMatrix = ({
         </div>
       </div>
       
-      {/* Matrix Grid */}
-      <div className="grid grid-cols-5 gap-2 px-1">
-        {/* Empty top-left cell */}
+      {/* Matrix Grid 5x5 + Labels */}
+      <div className="grid grid-cols-6 gap-2 px-1">
         <div className="h-8"></div>
-        
-        {/* Column headers */}
         {labels.map((label, index) => (
           <div key={`col-${index}`} className="flex items-center justify-center h-8">
-            <span className="text-[10px] font-black text-white/80 uppercase">
-              {label}
-            </span>
+            <span className="text-[10px] font-black text-white/80 uppercase">{label}</span>
           </div>
         ))}
-
-        {/* Matrix rows */}
         {labels.map((rowLabel, rowIndex) => (
           <React.Fragment key={`row-${rowIndex}`}>
-            {/* Row label */}
             <div className="flex items-center justify-end pr-2 h-10">
-              <span className="text-[10px] font-black text-white/80 uppercase text-right leading-tight">
-                {rowLabel}
-              </span>
+              <span className="text-[10px] font-black text-white/80 uppercase text-right leading-tight">{rowLabel}</span>
             </div>
-            
-            {/* Matrix cells */}
             {labels.map((colLabel, colIndex) => {
               const value = getSynergy(values[rowIndex], values[colIndex]);
               const style = getCellStyle(value);
-              
               return (
                 <div 
                   key={`cell-${rowIndex}-${colIndex}`}
                   onMouseEnter={() => setHoveredCell({ row: rowLabel, col: colLabel, val: value })}
                   onMouseLeave={() => setHoveredCell(null)}
-                  className={`
-                    h-10 rounded-lg flex items-center justify-center 
-                    text-[11px] font-black border border-white/5 
-                    ${style.bg} ${style.text} 
-                    transition-all hover:scale-110 cursor-crosshair shadow-inner
-                    ${hoveredCell?.row === rowLabel || hoveredCell?.col === colLabel ? 'ring-1 ring-white/10 brightness-125' : ''}
-                  `}
+                  className={`h-10 rounded-lg flex items-center justify-center text-[11px] font-black border border-white/5 ${style.bg} ${style.text} transition-all hover:scale-110 cursor-crosshair shadow-inner ${hoveredCell?.row === rowLabel || hoveredCell?.col === colLabel ? 'ring-1 ring-white/10 brightness-125' : ''}`}
                 >
                   {value}%
                 </div>
@@ -567,35 +516,17 @@ const DataSynergyMatrix = ({
         ))}
       </div>
 
-      {/* Score Summary */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl transition-all hover:bg-purple-500/20">
-          <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest mb-1">
-            Safety Index
-          </p>
+        <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+          <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest mb-1">Safety Index</p>
           <p className="text-[14px] font-black text-white">{sScore}%</p>
         </div>
-        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl transition-all hover:bg-emerald-500/20">
-          <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">
-            Logistics
-          </p>
-          <p className="text-[14px] font-black text-white">{lScore}%</p>
-        </div>
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl transition-all hover:bg-amber-500/20">
-          <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">
-            Success
-          </p>
-          <p className="text-[14px] font-black text-white">{suScore}%</p>
-        </div>
-        <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl transition-all hover:bg-rose-500/20">
-          <p className="text-[8px] font-black text-rose-400 uppercase tracking-widest mb-1">
-            Footfall
-          </p>
-          <p className="text-[14px] font-black text-white">{fScore}%</p>
+        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Climatic Synergy</p>
+          <p className="text-[14px] font-black text-white">{wScore}%</p>
         </div>
       </div>
 
-      {/* Neural Insight Display (Refined Tooltip Replacement) */}
       <div className="pt-2">
         <div className="p-3 bg-black/40 rounded-2xl border border-white/5 flex items-center justify-center min-h-[44px]">
           {hoveredCell ? (
@@ -603,6 +534,14 @@ const DataSynergyMatrix = ({
                <p className="text-[10px] font-black text-white uppercase tracking-tight">
                  {hoveredCell.row} ↔ {hoveredCell.col}: <span className={getCellStyle(hoveredCell.val).text}>{hoveredCell.val}% Neural Synergy</span>
                </p>
+            </div>
+          ) : weather ? (
+            <div className="flex items-center gap-4 animate-in fade-in">
+              <span className="text-xl">{(weather.condition === 'Sunny' || weather.condition === 'Clear') ? '☀️' : '☁️'}</span>
+              <div className="text-left">
+                <p className="text-[11px] font-black text-white uppercase leading-none">{weather.temp} • {weather.condition}</p>
+                <p className="text-[7px] text-white/40 uppercase font-black tracking-widest mt-1">Grid Grounding Active</p>
+              </div>
             </div>
           ) : (
             <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] italic">Scan matrix nodes for detailed causal reasoning</p>
@@ -771,6 +710,7 @@ export default function App() {
 
   const [analytics, setAnalytics] = useState<SpatialAnalytics | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [weather, setWeather] = useState<any | null>(null);
 
   const [isLensAnalyzing, setIsLensAnalyzing] = useState(false);
   const [lensTargetName, setLensTargetName] = useState<string>('');
@@ -824,6 +764,11 @@ export default function App() {
     hygieneScore: 85
   });
   const [newItem, setNewItem] = useState({ name: '', price: '' });
+
+  // NEW: Fetch weather data on location change
+  useEffect(() => {
+    fetchLocalWeather(location).then(setWeather).catch(console.error);
+  }, [location]);
 
   useEffect(() => {
     localStorage.setItem('geomind_profiles', JSON.stringify(myProfiles));
@@ -893,6 +838,42 @@ export default function App() {
       activeAgentTimeoutRef.current = window.setTimeout(() => {
         setActiveAgentName(null);
       }, 4000);
+    }
+  };
+
+  /**
+   * Triggers the discovery scrape via Gemini Search Grounding.
+   */
+  const startDiscovery = async () => {
+    setIsMining(true);
+    setExplorerTab('discovery');
+    setDiscoverySubTab('nodes');
+    addLog('Discovery', 'Initiating wide-band spatial food scrape...', 'processing');
+    try {
+      const result = await discoveryAgent("Legendary street food and hidden gems", location);
+      
+      if (!result.shops || result.shops.length === 0) {
+        addLog('Discovery', 'Minimal signals detected in current sector. Retry spatial sweep.', 'failed');
+        setIsMining(false);
+        return;
+      }
+
+      const updatedShops = [...shops.filter(s => !s.id.startsWith('sync-')), ...result.shops];
+      setShops(updatedShops);
+      setLastSources(result.sources);
+      
+      computeAnalytics(updatedShops);
+
+      if (result.logs && result.logs.length > 0) {
+        result.logs.forEach(msg => addLog('Discovery', msg, 'resolved'));
+      }
+      
+      addLog('Discovery', `Discovery Complete: Identified ${result.shops.length} legends in this sector.`, 'resolved');
+      setIsMining(false);
+    } catch (err) {
+      console.error("Scrape Error:", err);
+      addLog('Discovery', 'Discovery node timeout. Atmospheric interference suspected.', 'failed');
+      setIsMining(false);
     }
   };
 
@@ -1205,7 +1186,6 @@ const handleShopSelect = async (shop: Shop) => {
         cuisine: regForm.cuisine,
         emoji: regForm.emoji,
         description: regForm.description,
-        // Fixed: Use regForm instead of regHour
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
@@ -1221,7 +1201,6 @@ const handleShopSelect = async (shop: Shop) => {
         emoji: regForm.emoji, 
         description: regForm.description,
         lastLocation: location,
-        // Fixed: Use regForm instead of regHour
         hours: `${regForm.startHour}:00 - ${regForm.endHour}:00`,
         menu: regForm.menu,
         youtubeLink: regForm.youtubeLink,
@@ -1319,39 +1298,6 @@ const handleShopSelect = async (shop: Shop) => {
     const bio = await generateVendorBio(regForm.name, regForm.cuisine);
     setRegForm(prev => ({ ...prev, description: bio }));
     setIsGeneratingBio(false);
-  };
-
-  const startDiscovery = async () => {
-    setIsMining(true);
-    setExplorerTab('discovery');
-    setDiscoverySubTab('nodes');
-    addLog('Discovery', 'Initiating wide-band spatial food scrape...', 'processing');
-    try {
-      const result = await discoveryAgent("Legendary street food and hidden gems", location);
-      
-      if (!result.shops || result.shops.length === 0) {
-        addLog('Discovery', 'Minimal signals detected in current sector. Retry spatial sweep.', 'failed');
-        setIsMining(false);
-        return;
-      }
-
-      const updatedShops = [...shops.filter(s => !s.id.startsWith('sync-')), ...result.shops];
-      setShops(updatedShops);
-      setLastSources(result.sources);
-      
-      computeAnalytics(updatedShops);
-
-      if (result.logs && result.logs.length > 0) {
-        result.logs.forEach(msg => addLog('Discovery', msg, 'resolved'));
-      }
-      
-      addLog('Discovery', `Discovery Complete: Identified ${result.shops.length} legends in this sector.`, 'resolved');
-      setIsMining(false);
-    } catch (err) {
-      console.error("Scrape Error:", err);
-      addLog('Discovery', 'Discovery node timeout. Atmospheric interference suspected.', 'failed');
-      setIsMining(false);
-    }
   };
 
   const handleChatSubmit = async (text: string) => {
@@ -2016,6 +1962,7 @@ const handleShopSelect = async (shop: Shop) => {
                              {lensShopData && (
           <DataSynergyMatrix 
             shop={lensShopData}
+            weather={weather}
             metrics={{
               safetyScore: Math.round(
                 (lensShopData.safetyMetrics.crimeSafety + 
