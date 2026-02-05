@@ -7,6 +7,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 /**
  * Climate Grounding Agent
  * Fetches real-time weather and calculates a "Street Food Synergy Score"
+ * Fixed: Robustly cleans grounding noise and formatting artifacts.
  */
 export const fetchLocalWeather = async (location: LatLng) => {
   const response = await ai.models.generateContent({
@@ -16,17 +17,18 @@ export const fetchLocalWeather = async (location: LatLng) => {
     
     REQUIRED JSON OUTPUT:
     {
-      "temp": "concise temperature, only numeric value and unit (e.g. 28°C)",
-      "condition": "vivid 1-word condition (e.g. Sunny, Rainy, Humid, Cloudy)",
+      "temp": "numeric value + unit only (e.g. 28°C)",
+      "condition": "1-word condition (e.g. Sunny)",
       "impactScore": 85,
       "reasoning": "1-sentence spatial impact statement"
     }
 
     STRICT RULES:
-    - Do NOT include any source citations, footnotes, or bracketed numbers like [1], [2], or 【source】.
-    - The 'temp' field must be a simple string like '29°C'. Do not add RealFeel or other stats.
-    - The 'condition' field must be exactly one or two words.
-    - Return ONLY valid raw JSON. No preamble.`,
+    - Return ONLY the raw JSON block. No preamble, no postscript.
+    - Do NOT include any source citations like [1], [2], (source), or 【source】.
+    - The 'temp' field must be a SINGLE simple value like '29°C'. Do NOT include RealFeel or Fahrenheit alternatives.
+    - The 'condition' field must be a SINGLE vivid word.
+    - Ensure the JSON is valid and terminated correctly.`,
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -42,38 +44,81 @@ export const fetchLocalWeather = async (location: LatLng) => {
     }
   });
 
-  // Aggressive cleaning to strip grounding citations and truncate extra verbiage
-  const clean = (str: any, isTemp: boolean = false) => {
-    if (typeof str !== 'string') return str;
-    // Remove all forms of citations common in grounding
-    let cleaned = str.replace(/\[\d+\]|【.*?】|\(source\)|source|snippet/gi, '').trim();
+  // Aggressive cleaning to strip all grounding markers and truncate excessive metadata
+  const cleanField = (val: any, isTemp: boolean = false) => {
+    if (typeof val !== 'string') return val;
     
-    // For temperature, truncate after the first unit to avoid "29°C, 84°F (RealFeel...)"
+    // 1. Remove common grounding citation patterns: [1], [2], 【1】, (Source 1), etc.
+    let cleaned = val.replace(/\[\d+\]|【.*?】|\(\s*Source\s*\d*\s*\)|source|snippet/gi, '').trim();
+    
+    // 2. Remove other common AI grounding artifacts like "•" or "..."
+    cleaned = cleaned.replace(/[•…*]/g, '').trim();
+
     if (isTemp) {
-      const match = cleaned.match(/^\d+°[CF]/i);
-      if (match) return match[0];
-      // Fallback: take part before first comma, paren or space
-      cleaned = cleaned.split(/,|\(|\s/)[0].trim();
+      // For temperature, strictly extract the first numeric+degree pattern to avoid "29°C (84°F) RealFeel 35°C"
+      const tempMatch = cleaned.match(/-?\d+\s*°[CF]/i);
+      if (tempMatch) return tempMatch[0].replace(/\s+/g, '');
+      // Fallback: take the first word/token
+      cleaned = cleaned.split(/,|\(|\s/)[0];
     }
     
-    return cleaned;
+    return cleaned.trim();
   };
 
   try {
     const text = response.text || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const rawJson = jsonMatch ? jsonMatch[0] : text;
     
+    // Robust JSON extraction for grounding responses which can be massive
+    // We try to find the last valid-looking JSON object if the string is huge
+    let rawJson = "";
+    const jsonMatches = [...text.matchAll(/\{[\s\S]*?\}/g)];
+    
+    if (jsonMatches.length > 0) {
+      // Often the real JSON is the first or last block depending on preamble/postscript
+      // We check for the presence of our required keys to be sure
+      const validBlock = jsonMatches.reverse().find(m => 
+        m[0].includes('"temp"') && m[0].includes('"condition"')
+      );
+      rawJson = validBlock ? validBlock[0] : jsonMatches[0][0];
+    } else {
+      rawJson = text;
+    }
+
+    // Secondary fix for "Unterminated string" - if it ends abruptly, try to close it
+    // This is a safety measure for truncated long-context responses
+    if (rawJson.length > 0 && !rawJson.endsWith('}')) {
+      const lastBrace = rawJson.lastIndexOf('}');
+      if (lastBrace !== -1) {
+        rawJson = rawJson.substring(0, lastBrace + 1);
+      } else {
+        rawJson += '}'; // Blind attempt at closure if no brace found
+      }
+    }
+
     const data = JSON.parse(rawJson);
     
     return {
-      temp: clean(data.temp, true) || "28°C",
-      condition: clean(data.condition) || "Clear",
+      temp: cleanField(data.temp, true) || "--°C",
+      condition: cleanField(data.condition) || "Clear",
       impactScore: typeof data.impactScore === 'number' ? data.impactScore : 80,
-      reasoning: clean(data.reasoning) || "Local thermal conditions are stable."
+      reasoning: cleanField(data.reasoning) || "Local thermal conditions are stable."
     };
   } catch (e) {
-    console.error("Weather extraction failure:", e);
+    console.error("Weather sync failure (JSON Parse Error):", e);
+    // Fallback: Attempt manual string extraction if JSON.parse fails
+    const text = response.text || "";
+    const tempMatch = text.match(/"temp":\s*"([^"]+)"/);
+    const condMatch = text.match(/"condition":\s*"([^"]+)"/);
+    
+    if (tempMatch && condMatch) {
+       return {
+         temp: cleanField(tempMatch[1], true),
+         condition: cleanField(condMatch[1]),
+         impactScore: 85,
+         reasoning: "Coordinates scanned. Street food conditions are favorable."
+       };
+    }
+
     return { temp: "28°C", condition: "Clear", impactScore: 80, reasoning: "Local thermal conditions are stable." };
   }
 };
@@ -142,7 +187,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
           "description": "Story", 
           "address": "Address",
           "successReasoning": { "locationGravity": 85, "flavorMoat": 90, "socialResonance": 75, "economicFit": 80 },
-          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe: 95, "nearestPoliceStations": ["Name 1"] },
+          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe": 95, "nearestPoliceStations": ["Name 1"] },
           "urbanLogistics": { "transitAccessibility": 90, "walkabilityScore": 85, "parkingAvailability": 40, "publicTransportNodes": ["Stop A"] },
           "predictedFootfall": [ {"period": "6am-10am", "volume": 40}, {"period": "11am-2pm", "volume": 85}, {"period": "3pm-6pm", "volume": 55}, {"period": "7pm-10pm", "volume": 95}, {"period": "11pm-2am", "volume": 20} ]
         }
