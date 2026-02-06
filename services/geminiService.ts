@@ -26,7 +26,7 @@ export const fetchLocalWeather = async (location: LatLng) => {
     - Do NOT include any source citations, footnotes, or bracketed numbers like [1], [2], or 【source】.
     - The 'temp' field must be a simple string like '29°C'. Do not add RealFeel or other stats.
     - The 'condition' field must be exactly one or two words.
-    - Return ONLY valid raw JSON. No preamble, No thinking, no explanations.`,
+    - Return ONLY valid raw JSON. No preamble.`,
     config: {
       tools: [{ googleSearch: {} }],
       responseMimeType: "application/json",
@@ -117,7 +117,7 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 10 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
+    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
     
     INSTRUCTIONS:
     1. Use Google Search to find high-accuracy, real-world data about food spots near this location.
@@ -127,7 +127,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
        - flavorMoat: Score (0-100) based on dish uniqueness.
        - socialResonance: Score (0-100) based on local legend status.
        - economicFit: Score (0-100) based on neighborhood demographic match.
-    4. SAFETY & LOGISTICS: Identify the nearest 1 police station and nearest 1 public transport node.
+    4. SAFETY & LOGISTICS: Identify the nearest 3 police stations and nearest 3 public transport nodes.
     5. FOOTFALL PREDICTION: Predicted volume (0-100) for 5 time windows.
     
     REQUIRED JSON STRUCTURE (Output ONLY this raw JSON object):
