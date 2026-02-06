@@ -117,7 +117,7 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 15 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
+    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 10 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
     
     INSTRUCTIONS:
     1. Use Google Search to find high-accuracy, real-world data about food spots near this location.
