@@ -200,13 +200,13 @@ const SuccessReasoningChart = ({ shop }: { shop: Shop }) => {
         <canvas ref={canvasRef} />
       </div>
       <div className="grid grid-cols-2 gap-2 p-3 bg-black/40 rounded-2xl border border-white/5">
-        <p className="col-span-2 text-[10px] font-black text-white/40 uppercase tracking-[0.3em] text-center mb-1">Success Logic: Cause & Effect</p>
+        <p className="col-span-2 text-[7px] font-black text-white/40 uppercase tracking-[0.3em] text-center mb-1">Success Logic: Cause & Effect</p>
         {logicPoints.map((point) => (
           <div key={point.label} className="flex items-center gap-2 bg-white/5 p-2 rounded-xl">
-            <span className="text-[12px]">{point.icon}</span>
+            <span className="text-[10px]">{point.icon}</span>
             <div className="flex flex-col">
-              <span className={`text-[11px] font-black uppercase ${point.color}`}>{point.label}</span>
-              <span className="text-[10px] font-bold text-white/60 leading-none">→ {point.outcome}</span>
+              <span className={`text-[8px] font-black uppercase ${point.color}`}>{point.label}</span>
+              <span className="text-[7px] font-bold text-white/60 leading-none">→ {point.outcome}</span>
             </div>
           </div>
         ))}
@@ -250,7 +250,7 @@ const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
             grid: { color: 'rgba(255, 255, 255, 0.1)' },
             pointLabels: { 
               color: 'rgba(255, 255, 255, 0.9)', 
-              font: { size: 11, weight: 'bold', family: 'monospace' } 
+              font: { size: 8, weight: 'bold', family: 'monospace' } 
             },
             ticks: { display: false, stepSize: 20 },
             suggestedMin: 0,
@@ -261,8 +261,8 @@ const SafetyRadar = ({ metrics }: { metrics: SafetyMetrics }) => {
           legend: { display: false },
           tooltip: {
             backgroundColor: 'rgba(0,0,0,0.8)',
-            titleFont: { size: 11, weight: 'bold' },
-            bodyFont: { size: 11 },
+            titleFont: { size: 10, weight: 'bold' },
+            bodyFont: { size: 10 },
             padding: 8,
             displayColors: false
           }
@@ -317,7 +317,7 @@ const LogisticsRadar = ({ logistics }: { logistics: UrbanLogistics }) => {
             grid: { color: 'rgba(255, 255, 255, 0.1)' },
             pointLabels: { 
               color: 'rgba(16, 185, 129, 0.9)', 
-              font: { size: 11, weight: 'bold', family: 'monospace' } 
+              font: { size: 8, weight: 'bold', family: 'monospace' } 
             },
             ticks: { display: false, stepSize: 20 },
             suggestedMin: 0,
@@ -328,8 +328,8 @@ const LogisticsRadar = ({ logistics }: { logistics: UrbanLogistics }) => {
           legend: { display: false },
           tooltip: {
             backgroundColor: 'rgba(0,0,0,0.8)',
-            titleFont: { size: 11, weight: 'bold' },
-            bodyFont: { size: 11 },
+            titleFont: { size: 10, weight: 'bold' },
+            bodyFont: { size: 10 },
             padding: 8,
             displayColors: false
           }
@@ -389,7 +389,7 @@ const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
             grid: { display: false },
             ticks: {
               color: 'rgba(255, 255, 255, 0.95)',
-              font: { size: 10, family: 'monospace', weight: 'bold' }
+              font: { size: 7, family: 'monospace', weight: 'bold' }
             }
           }
         },
@@ -398,8 +398,8 @@ const FootfallChart = ({ data }: { data: FootfallPoint[] }) => {
           tooltip: {
             backgroundColor: 'rgba(0,0,0,0.8)',
             padding: 6,
-            titleFont: { size: 10 },
-            bodyFont: { size: 10 }
+            titleFont: { size: 9 },
+            bodyFont: { size: 9 }
           }
         },
         responsive: true,
@@ -469,11 +469,11 @@ const DataSynergyMatrix = ({
         </p>
         <div className="h-4 flex items-center justify-center">
           {hoveredCell ? (
-            <p className="text-[11px] font-black text-white/60 uppercase tracking-widest animate-in fade-in zoom-in-95 duration-200">
+            <p className="text-[8px] font-black text-white/60 uppercase tracking-widest animate-in fade-in zoom-in-95 duration-200">
               {hoveredCell.row} <span className="text-purple-400">×</span> {hoveredCell.col} Correlation
             </p>
           ) : (
-            <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em]">Neural grid standby...</p>
+            <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.2em]">Neural grid standby...</p>
           )}
         </div>
       </div>
@@ -482,13 +482,13 @@ const DataSynergyMatrix = ({
         <div className="h-8"></div>
         {labels.map((label, index) => (
           <div key={`col-${index}`} className="flex items-center justify-center h-8">
-            <span className="text-[12px] font-black text-white/80 uppercase">{label}</span>
+            <span className="text-[10px] font-black text-white/80 uppercase">{label}</span>
           </div>
         ))}
         {labels.map((rowLabel, rowIndex) => (
           <React.Fragment key={`row-${rowIndex}`}>
             <div className="flex items-center justify-end pr-2 h-10">
-              <span className="text-[12px] font-black text-white/80 uppercase text-right leading-tight">{rowLabel}</span>
+              <span className="text-[10px] font-black text-white/80 uppercase text-right leading-tight">{rowLabel}</span>
             </div>
             {labels.map((colLabel, colIndex) => {
               const value = getSynergy(values[rowIndex], values[colIndex]);
@@ -498,7 +498,7 @@ const DataSynergyMatrix = ({
                   key={`cell-${rowIndex}-${colIndex}`}
                   onMouseEnter={() => setHoveredCell({ row: rowLabel, col: colLabel, val: value })}
                   onMouseLeave={() => setHoveredCell(null)}
-                  className={`h-10 rounded-lg flex items-center justify-center text-[12px] font-black border border-white/5 ${style.bg} ${style.text} transition-all hover:scale-110 cursor-crosshair shadow-inner ${hoveredCell?.row === rowLabel || hoveredCell?.col === colLabel ? 'ring-1 ring-white/10 brightness-125' : ''}`}
+                  className={`h-10 rounded-lg flex items-center justify-center text-[11px] font-black border border-white/5 ${style.bg} ${style.text} transition-all hover:scale-110 cursor-crosshair shadow-inner ${hoveredCell?.row === rowLabel || hoveredCell?.col === colLabel ? 'ring-1 ring-white/10 brightness-125' : ''}`}
                 >
                   {value}%
                 </div>
@@ -510,11 +510,11 @@ const DataSynergyMatrix = ({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-          <p className="text-[11px] font-black text-purple-400 uppercase tracking-widest mb-1">Safety Index</p>
+          <p className="text-[8px] font-black text-purple-400 uppercase tracking-widest mb-1">Safety Index</p>
           <p className="text-[14px] font-black text-white">{sScore}%</p>
         </div>
         <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-          <p className="text-[11px] font-black text-emerald-400 uppercase tracking-widest mb-1">Climatic Synergy</p>
+          <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest mb-1">Climatic Synergy</p>
           <p className="text-[14px] font-black text-white">{wScore}%</p>
         </div>
       </div>
@@ -523,7 +523,7 @@ const DataSynergyMatrix = ({
         <div className="p-3 bg-black/40 rounded-2xl border border-white/5 flex items-center justify-center min-h-[44px]">
           {hoveredCell ? (
             <div className="text-center animate-in fade-in slide-in-from-bottom-1 duration-300">
-               <p className="text-[12px] font-black text-white uppercase tracking-tight">
+               <p className="text-[10px] font-black text-white uppercase tracking-tight">
                  {hoveredCell.row} ↔ {hoveredCell.col}: <span className={getCellStyle(hoveredCell.val).text}>{hoveredCell.val}% Neural Synergy</span>
                </p>
             </div>
@@ -532,11 +532,11 @@ const DataSynergyMatrix = ({
               <span className="text-xl">{(weather.condition === 'Sunny' || weather.condition === 'Clear') ? '☀️' : '☁️'}</span>
               <div className="text-left">
                 <p className="text-[11px] font-black text-white uppercase leading-none">{weather.temp} • {weather.condition}</p>
-                <p className="text-[10px] text-white/40 uppercase font-black tracking-widest mt-1">Grid Grounding Active</p>
+                <p className="text-[7px] text-white/40 uppercase font-black tracking-widest mt-1">Grid Grounding Active</p>
               </div>
             </div>
           ) : (
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] italic">Scan matrix nodes for detailed causal reasoning</p>
+            <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.2em] italic">Scan matrix nodes for detailed causal reasoning</p>
           )}
         </div>
       </div>
@@ -547,7 +547,7 @@ const DataSynergyMatrix = ({
 const MetricBar = ({ label, value, colorClass, textColorClass, glowClass }: { label: string, value: number, colorClass: string, textColorClass: string, glowClass: string }) => {
   return (
     <div className="space-y-1 flex flex-col">
-      <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest px-0.5">
+      <div className="flex justify-between items-center text-[7px] font-black uppercase tracking-widest px-0.5">
         <span className="text-white/80">{label}</span>
         <span className={textColorClass}>{value}%</span>
       </div>
@@ -650,7 +650,7 @@ const VoiceWave = ({ isActive, isSpeaking, onStop }: { isActive: boolean; isSpea
       <div className={`absolute inset-1 bg-gradient-to-bl ${palette[1]} opacity-90 blur-md animate-siri-liquid-alt mix-blend-screen transition-all duration-700`}></div>
       {onStop && isSpeaking ? (
         <button onClick={(e) => { e.stopPropagation(); onStop(); }} className="relative z-10 w-7 h-7 bg-black/60 hover:bg-black rounded-full flex items-center justify-center text-white/80 transition-all border border-white/20 hover:scale-110 active:scale-90" title="Stop Audio">
-          <span className="text-[10px]">■</span>
+          <span className="text-[9px]">■</span>
         </button>
       ) : (
         <div className="relative w-4 h-4 bg-white rounded-full shadow-[0_0_15px_rgba(255,255,255,1)] border border-white/40 animate-pulse"></div>
@@ -666,7 +666,7 @@ const SetupAnimation = () => (
       <span className="animate-bounce delay-200 duration-700">🍳</span>
       <span className="animate-bounce delay-500 duration-700">🚚</span>
     </div>
-    <span className="text-[10px] font-black uppercase tracking-widest animate-pulse">Establishing Link...</span>
+    <span className="text-[7px] font-black uppercase tracking-widest animate-pulse">Establishing Link...</span>
   </div>
 );
 
@@ -1143,7 +1143,6 @@ const handleShopSelect = async (shop: Shop) => {
   const syncGPS = () => {
     setIsUpdatingGPS(true);
     if (navigator.geolocation) {
-      // Fix: Removed duplicate error callback to satisfy expected argument count (1-3)
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const newLoc = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -1503,7 +1502,7 @@ const handleShopSelect = async (shop: Shop) => {
               </button>
             </div>
             <div className="flex gap-2">
-              <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
+              <button onClick={fetchFlavorHistory} className={`px-4 py-1.5 rounded-lg text-[9px] font-black transition-all ${userMode === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>Flavor Genealogy</button>
             </div>
           </div>
 
@@ -1513,13 +1512,13 @@ const handleShopSelect = async (shop: Shop) => {
             />
             <button 
               onClick={() => setUserMode('explorer')} 
-              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'explorer' || userMode === 'history' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
+              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'explorer' || userMode === 'history' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
             >
               Explorer
             </button>
             <button 
               onClick={() => setUserMode('vendor')} 
-              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'vendor' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
+              className={`relative z-10 flex-1 py-2.5 rounded-lg text-[10px] font-black transition-all uppercase tracking-[0.2em] ${userMode === 'vendor' ? 'text-white' : 'text-white/30 hover:text-white/50'}`}
             >
               Hub
             </button>
@@ -1528,10 +1527,10 @@ const handleShopSelect = async (shop: Shop) => {
           {(userMode === 'explorer' || userMode === 'history') ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 text-[11px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg">
+                <button onClick={startDiscovery} disabled={isMining} className="py-4 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] shadow-lg">
                   {isMining ? <SetupAnimation /> : 'Run Food Scrape'}
                 </button>
-                <button onClick={() => { setExplorerTab('live_vendors'); }} className={`py-4 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 text-[11px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
+                <button onClick={() => { setExplorerTab('live_vendors'); }} className={`py-4 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-500 hover:text-white border border-emerald-500/20 text-[9px] font-black uppercase rounded-xl transition-all active:scale-[0.98] ${explorerTab === 'live_vendors' ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20' : ''}`}>
                    Live Signals ({liveVendors.length})
                 </button>
               </div>
@@ -1539,19 +1538,19 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex gap-1 bg-[#1a1a1a] p-1 rounded-xl border border-white/5 shadow-inner">
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('logs'); }} 
-                  className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'logs' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Intel
                 </button>
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('discovery'); }} 
-                  className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'discovery' ? 'bg-white/10 text-white shadow-[0_0_10px_rgba(255, 255, 255, 0.05)]' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Legends
                 </button>
                 <button 
                   onClick={() => { setUserMode('explorer'); setExplorerTab('lens'); }} 
-                  className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-white/10 text-white' : 'text-white/20 hover:text-white/40'}`}
+                  className={`flex-1 py-2 text-[8px] font-black uppercase rounded-lg transition-all duration-300 ${userMode === 'explorer' && explorerTab === 'lens' ? 'bg-white/10 text-white' : 'text-white/20 hover:text-white/40'}`}
                 >
                   Lens
                 </button>
@@ -1565,23 +1564,23 @@ const handleShopSelect = async (shop: Shop) => {
                     <span className="text-3xl bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{activeProfile?.emoji}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-black text-white uppercase truncate tracking-tight">{activeProfile?.name}</p>
-                      <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">{activeProfile?.cuisine} Expertise</p>
+                      <p className="text-[8px] text-emerald-400 font-black uppercase tracking-widest">{activeProfile?.cuisine} Expertise</p>
                     </div>
-                    <button onClick={() => setActiveProfileId(null)} className="text-[12px] text-white/20 hover:text-white transition-colors p-2">✕</button>
+                    <button onClick={() => setActiveProfileId(null)} className="text-[10px] text-white/20 hover:text-white transition-colors p-2">✕</button>
                   </div>
                   <div className="grid grid-cols-1 gap-3 relative z-10">
-                    <button onClick={handleToggleSignal} className={`py-4 text-[11px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isCurrentlyLive ? 'bg-rose-600 text-white shadow-rose-600/30' : 'bg-emerald-600 text-white shadow-emerald-600/30'}`}>
+                    <button onClick={handleToggleSignal} className={`py-4 text-[10px] font-black rounded-2xl transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2 ${isCurrentlyLive ? 'bg-rose-600 text-white shadow-rose-600/30' : 'bg-emerald-600 text-white shadow-emerald-600/30'}`}>
                       {isCurrentlyLive ? 'DEACTIVATE LIVE SIGNAL' : 'ACTIVATE LIVE SIGNAL'}
                     </button>
                     <div className="space-y-1.5">
-                       <div className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.2em] px-1 text-center">
+                       <div className="text-[8px] text-indigo-300 font-black uppercase tracking-[0.2em] px-1 text-center">
                          Fix: {location.lat.toFixed(6)} N, {location.lng.toFixed(6)} E
                        </div>
                        <div className="flex gap-2">
-                         <button onClick={() => syncGPS()} disabled={isUpdatingGPS} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[11px] font-black uppercase rounded-2xl border border-white/5 transition-all">
+                         <button onClick={() => syncGPS()} disabled={isUpdatingGPS} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">
                            {isUpdatingGPS ? '...' : '🛰️ Sync GPS'}
                          </button>
-                         <button onClick={() => activeProfile && startEditHub(activeProfile)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[11px] font-black uppercase rounded-2xl border border-white/5 transition-all">Edit Node</button>
+                         <button onClick={() => activeProfile && startEditHub(activeProfile)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white text-[9px] font-black uppercase rounded-2xl border border-white/5 transition-all">Edit Node</button>
                        </div>
                     </div>
                   </div>
@@ -1591,7 +1590,7 @@ const handleShopSelect = async (shop: Shop) => {
                   setRegForm({ name: '', cuisine: '', emoji: '🥘', description: '', startHour: 9, endHour: 22, menu: [] as MenuItem[], youtubeLink: '', manualDMS: '', hygieneScore: 85 });
                   setIsEditing(false); 
                   setIsRegistering(true); 
-                }} className="w-full py-12 border border-dashed border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/5 text-indigo-400/60 hover:text-indigo-400 text-[11px] font-black uppercase rounded-[3rem] transition-all group overflow-hidden relative shadow-inner">
+                }} className="w-full py-12 border border-dashed border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/5 text-indigo-400/60 hover:text-indigo-400 text-[10px] font-black uppercase rounded-[3rem] transition-all group overflow-hidden relative shadow-inner">
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <span className="flex flex-col items-center gap-3 relative z-10">
                     <span className="text-4xl opacity-40 group-hover:opacity-100 transition-all duration-700">🏬</span>
@@ -1608,11 +1607,11 @@ const handleShopSelect = async (shop: Shop) => {
             <div className="space-y-8 animate-in fade-in duration-700 pb-20">
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[12px] font-black text-amber-400 uppercase tracking-[0.3em]">Cross-Temporal Synthesis</span>
+                  <span className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em]">Cross-Temporal Synthesis</span>
                 </div>
                 <button 
                   onClick={() => historyFileInputRef.current?.click()}
-                  className="w-full py-4 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[11px] font-black uppercase rounded-2xl shadow-lg hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center gap-3"
+                  className="w-full py-4 bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase rounded-2xl shadow-lg hover:bg-amber-600 hover:text-white transition-all flex items-center justify-center gap-3"
                 >
                   📷 Trace Visual Genealogy
                 </button>
@@ -1628,7 +1627,7 @@ const handleShopSelect = async (shop: Shop) => {
               {isHistoryMining ? (
                 <div className="py-20 flex flex-col items-center justify-center space-y-6">
                   <div className="text-5xl animate-bounce">🕰️</div>
-                  <p className="text-[12px] font-black text-amber-400 uppercase tracking-[0.5em] text-center animate-pulse">REASONING OVER HISTORICAL TOKENS...</p>
+                  <p className="text-[11px] font-black text-amber-400 uppercase tracking-[0.5em] text-center animate-pulse">REASONING OVER HISTORICAL TOKENS...</p>
                 </div>
               ) : (
                 <>
@@ -1643,43 +1642,43 @@ const handleShopSelect = async (shop: Shop) => {
                         <div className="flex justify-between items-start">
                           <div className="space-y-1">
                             <h3 className="text-xl font-black text-white uppercase tracking-tighter">{imageFlavorAnalysis.name}</h3>
-                            <p className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Authenticity Grid: {imageFlavorAnalysis.authenticity_score}</p>
+                            <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Authenticity Grid: {imageFlavorAnalysis.authenticity_score}</p>
                           </div>
                         </div>
-                        <p className="text-[13px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{imageFlavorAnalysis.narrative}"</p>
+                        <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{imageFlavorAnalysis.narrative}"</p>
                         
                         <div className="grid grid-cols-3 gap-3 pt-2">
                            <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
-                              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Protein</p>
-                              <p className="text-[12px] font-bold text-white">{imageFlavorAnalysis.protein}</p>
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Protein</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.protein}</p>
                            </div>
                            <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
-                              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Energy</p>
-                              <p className="text-[12px] font-bold text-white">{imageFlavorAnalysis.calories}</p>
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Energy</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.calories}</p>
                            </div>
                            <div className="p-3 bg-black/40 border border-amber-500/20 rounded-2xl text-center">
-                              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest mb-1">Carbs</p>
-                              <p className="text-[12px] font-bold text-white">{imageFlavorAnalysis.carbs}</p>
+                              <p className="text-[8px] font-black text-amber-400 uppercase tracking-widest mb-1">Carbs</p>
+                              <p className="text-[11px] font-bold text-white">{imageFlavorAnalysis.carbs}</p>
                            </div>
                         </div>
 
                         {imageFlavorAnalysis.recommended_shops && imageFlavorAnalysis.recommended_shops.length > 0 && (
                           <div className="space-y-2 mt-4 pt-4 border-t border-amber-500/20">
-                            <p className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em]">Grid Recommendations</p>
+                            <p className="text-[9px] font-black text-amber-400 uppercase tracking-[0.3em]">Grid Recommendations</p>
                             <div className="flex flex-col gap-2">
                               {imageFlavorAnalysis.recommended_shops.map((shopName, idx) => (
                                 <div key={idx} className="flex items-center gap-3 p-3 bg-black/40 rounded-xl border border-white/5 transition-all hover:bg-white/5 group cursor-default">
                                   <span className="text-xs group-hover:scale-110 transition-transform">📍</span>
-                                  <span className="text-[12px] font-black text-white uppercase tracking-tight">{shopName}</span>
+                                  <span className="text-[11px] font-black text-white uppercase tracking-tight">{shopName}</span>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
-                        <p className="text-[10px] text-amber-300 font-bold italic mt-2 animate-pulse">* Nutritional data is an AI estimate for educational purposes</p>
+                        <p className="text-[9px] text-amber-300 font-bold italic mt-2 animate-pulse">* Nutritional data is an AI estimate for educational purposes</p>
                         <div className="flex flex-wrap gap-2 pt-2">
                           {imageFlavorAnalysis.history_tags.map((tag, i) => (
-                            <span key={i} className="text-[10px] px-3 py-1.5 bg-amber-500/10 text-amber-300 font-black uppercase rounded-xl border border-amber-500/20">#{tag}</span>
+                            <span key={i} className="text-[8px] px-3 py-1.5 bg-amber-500/10 text-amber-300 font-black uppercase rounded-xl border border-amber-500/20">#{tag}</span>
                           ))}
                         </div>
                       </div>
@@ -1690,7 +1689,7 @@ const handleShopSelect = async (shop: Shop) => {
                     <div className="space-y-12 pb-20 animate-in fade-in duration-700">
                       <div className="p-6 bg-amber-950/40 border border-amber-500/40 rounded-3xl relative overflow-hidden group shadow-2xl">
                         <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-3">{flavorHistory.neighborhood} Evolution</h3>
-                        <p className="text-[13px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{flavorHistory.summary}"</p>
+                        <p className="text-[12px] font-black text-white leading-relaxed italic border-l-2 border-amber-500/40 pl-4 py-1">"{flavorHistory.summary}"</p>
                       </div>
                       <div className="relative pl-10 space-y-12">
                         <div className="absolute left-3 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 via-amber-400/40 to-transparent rounded-full"></div>
@@ -1698,15 +1697,15 @@ const handleShopSelect = async (shop: Shop) => {
                           <div key={i} className="relative group">
                             <div className="absolute -left-10 top-1.5 w-7 h-7 bg-amber-950 border-4 border-amber-400 rounded-full z-10 shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
                             <div className="space-y-4">
-                              <span className="text-[11px] font-black text-amber-400 uppercase tracking-[0.3em] block">{era.period}</span>
+                              <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.3em] block">{era.period}</span>
                               <h4 className="text-[16px] font-black text-white uppercase tracking-tight">{era.profile}</h4>
-                              <p className="text-[12px] font-black text-slate-100 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
+                              <p className="text-[11px] font-black text-slate-100 leading-relaxed bg-white/5 p-4 rounded-2xl border border-white/10">{era.description}</p>
                               <div className="bg-amber-950/20 p-5 rounded-3xl border border-amber-500/20 space-y-5">
                                 <div className="space-y-3">
-                                  <p className="text-[10px] font-black text-amber-300 uppercase tracking-widest">Notable Staples</p>
+                                  <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Notable Staples</p>
                                   <div className="flex flex-wrap gap-2.5">
                                     {era.popularItems.map((item, j) => (
-                                      <span key={j} className="text-[10px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase">
+                                      <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase">
                                         {item}
                                       </span>
                                     ))}
@@ -1733,23 +1732,23 @@ const handleShopSelect = async (shop: Shop) => {
                             <span className="text-2xl">🌍</span>
                             <h3 className="text-[14px] font-black text-white uppercase tracking-tighter">Mission: Street Visibility</h3>
                          </div>
-                         <p className="text-[12px] font-bold text-slate-400 leading-relaxed">
+                         <p className="text-[11px] font-bold text-slate-400 leading-relaxed">
                            In Tamil Nadu, street vendors are the backbone of the urban grid. However, a massive digital divide exists.
                          </p>
                          <div className="grid grid-cols-2 gap-3 pt-2">
                            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-1">
-                             <p className="text-[20px] font-black text-rose-500 leading-none">300K</p>
-                             <p className="text-[10px] font-black uppercase text-rose-400/60 tracking-widest">Govt Identified</p>
+                             <p className="text-[18px] font-black text-rose-500 leading-none">300K</p>
+                             <p className="text-[7px] font-black uppercase text-rose-400/60 tracking-widest">Govt Identified</p>
                            </div>
                            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-1">
-                             <p className="text-[20px] font-black text-emerald-500 leading-none">500K+</p>
-                             <p className="text-[10px] font-black uppercase text-emerald-400/60 tracking-widest">Estimated Total</p>
+                             <p className="text-[18px] font-black text-emerald-500 leading-none">500K+</p>
+                             <p className="text-[7px] font-black uppercase text-emerald-400/60 tracking-widest">Estimated Total</p>
                            </div>
                          </div>
                       </div>
 
                       <div className="space-y-4">
-                        <h4 className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.4em] px-2">The Solution: EyAI</h4>
+                        <h4 className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.4em] px-2">The Solution: EyAI</h4>
                         <div className="space-y-3">
                           {[
                             { icon: '📡', title: 'Live Grid Sync', desc: 'Allowing half a million vendors to broadcast their location.' },
@@ -1759,8 +1758,8 @@ const handleShopSelect = async (shop: Shop) => {
                             <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex gap-4 items-start">
                               <span className="text-xl bg-white/5 p-2 rounded-xl">{item.icon}</span>
                               <div className="space-y-1">
-                                <p className="text-[12px] font-black text-white uppercase tracking-tight">{item.title}</p>
-                                <p className="text-[10px] text-slate-500 leading-relaxed">{item.desc}</p>
+                                <p className="text-[11px] font-black text-white uppercase tracking-tight">{item.title}</p>
+                                <p className="text-[9px] text-slate-500 leading-relaxed">{item.desc}</p>
                               </div>
                             </div>
                           ))}
@@ -1768,13 +1767,13 @@ const handleShopSelect = async (shop: Shop) => {
                       </div>
 
                       <div className="p-6 bg-gradient-to-br from-indigo-600/20 to-transparent border border-indigo-500/30 rounded-[2.5rem] text-center space-y-2 shadow-2xl">
-                         <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Target Objective</p>
-                         <p className="text-[16px] font-black text-white uppercase tracking-tighter italic">"Syncing 500,000 Micro-Economies"</p>
+                         <p className="text-[8px] font-black text-indigo-300 uppercase tracking-widest">Target Objective</p>
+                         <p className="text-[14px] font-black text-white uppercase tracking-tighter italic">"Syncing 500,000 Micro-Economies"</p>
                       </div>
                     </div>
                   ) : explorerTab === 'logs' ? (
                     <div className="space-y-4">
-                      <button onClick={runVerificationSuite} disabled={isVerifying} className="w-full py-4 mb-4 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[11px] font-black uppercase transition-all shadow-lg flex items-center justify-center gap-3">
+                      <button onClick={runVerificationSuite} disabled={isVerifying} className="w-full py-4 mb-4 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg flex items-center justify-center gap-3">
                         {isVerifying ? "Running Coordination Loop..." : "🚀 Run Autonomous Verification"}
                       </button>
                       
@@ -1782,8 +1781,8 @@ const handleShopSelect = async (shop: Shop) => {
 
                       {logs.map(l => (
                         <div key={l.id} className="p-4 rounded-xl border border-white/5 bg-[#0a0a0a] animate-in slide-in-from-left-4 duration-300">
-                          <span className={`text-[10px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Healing' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
-                          <p className="text-[11px] font-bold leading-relaxed mt-2 text-slate-400 whitespace-pre-line">{l.message}</p>
+                          <span className={`text-[7px] font-black px-2 py-0.5 rounded border uppercase ${l.agent === 'Healing' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : l.agent === 'Linguistic' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>{l.agent}</span>
+                          <p className="text-[10px] font-bold leading-relaxed mt-2 text-slate-400 whitespace-pre-line">{l.message}</p>
                         </div>
                       ))}
                     </div>
@@ -1792,34 +1791,34 @@ const handleShopSelect = async (shop: Shop) => {
                       {isMining ? (
                         <div className="py-20 flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-500">
                           <div className="relative text-6xl animate-bounce drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">🛰️</div>
-                          <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse">CALIBRATING SPATIAL GRID...</p>
+                          <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse">CALIBRATING SPATIAL GRID...</p>
                         </div>
                       ) : (
                         <>
                           <div className="flex bg-[#0a0a0a] p-1.5 rounded-2xl border border-white/5 shadow-inner">
-                            <button onClick={() => setDiscoverySubTab('nodes')} className={`flex-1 py-3 text-[11px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Nodes</button>
-                            <button onClick={() => { setDiscoverySubTab('intelligence'); if (!analytics) computeAnalytics(); }} className={`flex-1 py-3 text-[11px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Intelligence</button>
+                            <button onClick={() => setDiscoverySubTab('nodes')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'nodes' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Nodes</button>
+                            <button onClick={() => { setDiscoverySubTab('intelligence'); if (!analytics) computeAnalytics(); }} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${discoverySubTab === 'intelligence' ? 'bg-indigo-600 text-white' : 'text-white/30'}`}>Intelligence</button>
                           </div>
                           {discoverySubTab === 'intelligence' && (
                             <div className="space-y-8 animate-in fade-in duration-700">
                               {isAnalyzing ? (
                                 <div className="py-20 flex flex-col items-center justify-center space-y-8">
                                   <div className="text-6xl animate-spin">📊</div>
-                                  <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse text-center">GENERATING SPATIAL INSIGHTS...</p>
+                                  <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.5em] animate-pulse text-center">GENERATING SPATIAL INSIGHTS...</p>
                                 </div>
                               ) : analytics ? (
                                 <div className="space-y-10 pb-20">
                                   <div className="p-6 bg-indigo-950/40 border border-indigo-500/40 rounded-[2.5rem] space-y-3 shadow-2xl relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl">📈</div>
-                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
-                                    <p className="text-[12px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
+                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
+                                    <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
                                   </div>
                                   <div className="space-y-4">
-                                    <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
                                     <div className="grid grid-cols-1 gap-3">
                                       {analytics.cuisineDistribution.map((c, i) => (
                                         <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-2">
-                                          <div className="flex justify-between items-center text-[12px] font-black uppercase">
+                                          <div className="flex justify-between items-center text-[11px] font-black uppercase">
                                             <span className="text-white">{c.label}</span>
                                             <span className="text-indigo-400">{c.percentage}%</span>
                                           </div>
@@ -1831,14 +1830,14 @@ const handleShopSelect = async (shop: Shop) => {
                                     </div>
                                   </div>
                                   <div className="space-y-4">
-                                    <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
                                       {analytics.priceSpectrum.map((p, i) => (
                                         <div key={i} className="p-5 bg-white/5 border border-white/5 rounded-[2rem] space-y-3">
-                                          <h4 className="text-[12px] font-black text-emerald-400 uppercase tracking-widest">{p.range}</h4>
+                                          <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">{p.range}</h4>
                                           <div className="flex flex-wrap gap-2">
                                             {p.nodes.map((node, j) => (
-                                              <span key={j} className="text-[10px] px-3 py-1 bg-white/5 border border-white/10 text-white/60 rounded-lg">{node}</span>
+                                              <span key={j} className="text-[9px] px-3 py-1 bg-white/5 border border-white/10 text-white/60 rounded-lg">{node}</span>
                                             ))}
                                           </div>
                                         </div>
@@ -1846,28 +1845,28 @@ const handleShopSelect = async (shop: Shop) => {
                                     </div>
                                   </div>
                                   <div className="space-y-4">
-                                    <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
                                     <div className="space-y-4">
                                       {analytics.legendaryIndex.map((l, i) => (
                                         <div key={i} className="p-5 bg-indigo-600/5 border border-indigo-500/20 rounded-[2rem] space-y-2 transition-all hover:bg-indigo-600/10">
                                           <div className="flex justify-between items-center">
-                                            <span className="text-[14px] font-black text-white uppercase tracking-tight">{l.name}</span>
-                                            <span className="text-[15px] font-black text-indigo-400">{l.score}</span>
+                                            <span className="text-[13px] font-black text-white uppercase tracking-tight">{l.name}</span>
+                                            <span className="text-[14px] font-black text-indigo-400">{l.score}</span>
                                           </div>
-                                          <p className="text-[11px] text-slate-400 italic leading-relaxed">"{l.reasoning}"</p>
+                                          <p className="text-[10px] text-slate-400 italic leading-relaxed">"{l.reasoning}"</p>
                                         </div>
                                       ))}
                                     </div>
                                   </div>
                                   <div className="space-y-4">
-                                    <p className="text-[11px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
+                                    <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
                                     <div className="grid grid-cols-1 gap-3">
                                       {analytics.customerSegmentation.map((s, i) => (
                                         <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center gap-4">
-                                          <div className="w-10 h-10 shrink-0 bg-white/10 rounded-xl flex items-center justify-center font-black text-white text-[11px]">{s.volume}%</div>
+                                          <div className="w-10 h-10 shrink-0 bg-white/10 rounded-xl flex items-center justify-center font-black text-white text-[10px]">{s.volume}%</div>
                                           <div className="flex-1 min-w-0">
-                                             <p className="text-[12px] font-black text-white uppercase truncate">{s.segment}</p>
-                                             <p className="text-[10px] text-slate-500 truncate">{s.description}</p>
+                                             <p className="text-[11px] font-black text-white uppercase truncate">{s.segment}</p>
+                                             <p className="text-[9px] text-slate-500 truncate">{s.description}</p>
                                           </div>
                                         </div>
                                       ))}
@@ -1876,8 +1875,8 @@ const handleShopSelect = async (shop: Shop) => {
                                 </div>
                               ) : (
                                 <div className="py-20 text-center opacity-20">
-                                  <p className="text-[11px] font-black uppercase tracking-widest">No Intelligence Data available in this sector.</p>
-                                  <button onClick={() => computeAnalytics()} className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase transition-all">Manual Sync</button>
+                                  <p className="text-[10px] font-black uppercase tracking-widest">No Intelligence Data available in this sector.</p>
+                                  <button onClick={() => computeAnalytics()} className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[9px] font-black uppercase transition-all">Manual Sync</button>
                                 </div>
                               )}
                             </div>
@@ -1890,8 +1889,8 @@ const handleShopSelect = async (shop: Shop) => {
                                     <span>{s.emoji}</span>
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-[16px] font-black text-white uppercase truncate tracking-tighter">{s.name}</p>
-                                    <p className="text-[11px] text-indigo-400/60 font-black uppercase truncate tracking-[0.2em]">{s.cuisine}</p>
+                                    <p className="text-[15px] font-black text-white uppercase truncate tracking-tighter">{s.name}</p>
+                                    <p className="text-[10px] text-indigo-400/60 font-black uppercase truncate tracking-[0.2em]">{s.cuisine}</p>
                                   </div>
                                 </button>
                               ))}
@@ -1903,8 +1902,8 @@ const handleShopSelect = async (shop: Shop) => {
                   ) : explorerTab === 'lens' ? (
                     <div className="space-y-6 h-full flex flex-col">
                       <div className="px-2 py-4 bg-white/5 border border-white/5 rounded-2xl flex flex-col gap-1 items-center justify-center text-center">
-                         <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Active Lens Target</p>
-                         <h4 className="text-[16px] font-black text-white uppercase tracking-tighter">
+                         <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Active Lens Target</p>
+                         <h4 className="text-[14px] font-black text-white uppercase tracking-tighter">
                            {lensTargetName || "Select a Food Node"}
                          </h4>
                       </div>
@@ -1917,26 +1916,26 @@ const handleShopSelect = async (shop: Shop) => {
                             </div>
                           </div>
                           <div className="text-center space-y-2">
-                            <p className="text-[12px] font-black text-indigo-400 uppercase tracking-[0.4em] animate-pulse">Analyzing Visual Nodes...</p>
-                            <p className="text-[10px] text-white/20 uppercase tracking-widest">Cross-referencing spatial metadata</p>
+                            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] animate-pulse">Analyzing Visual Nodes...</p>
+                            <p className="text-[8px] text-white/20 uppercase tracking-widest">Cross-referencing spatial metadata</p>
                           </div>
                         </div>
                       ) : lensAnalysis ? (
                         <div className="space-y-8 overflow-y-auto custom-scrollbar pb-10">
                           <div className="space-y-4">
-                            <p className="text-[11px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
+                            <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
                             {lensAnalysis.observations.map((obs, i) => (
                               <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
-                                <h5 className="text-[12px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
-                                <p className="text-[11px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                                <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
+                                <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
+                                <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
                               </div>
                             ))}
                           </div>
 
                           {lensShopData?.safetyMetrics && (
                             <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[11px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
+                              <p className="text-[10px] font-black text-indigo-300 uppercase tracking-[0.4em] text-center border-b border-indigo-500/10 pb-4">Safety Intelligence</p>
                               <SafetyRadar metrics={lensShopData.safetyMetrics} />
                               <div className="space-y-3 pt-2">
                                 <SafetyMetricBar label="Crime" value={lensShopData.safetyMetrics.crimeSafety} />
@@ -1945,12 +1944,12 @@ const handleShopSelect = async (shop: Shop) => {
                               </div>
                               {lensShopData.safetyMetrics.nearestPoliceStations && lensShopData.safetyMetrics.nearestPoliceStations.length > 0 && (
                                 <div className="space-y-2 pt-2 border-t border-indigo-500/10">
-                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Nearest Police Precincts</p>
+                                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Nearest Police Precincts</p>
                                   <div className="flex flex-col gap-1.5">
                                     {lensShopData.safetyMetrics.nearestPoliceStations.map((station, i) => (
                                       <div key={i} className="px-3 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-[11px]">👮</span>
-                                        <span className="text-[11px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
+                                        <span className="text-10px]">👮</span>
+                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -1961,7 +1960,7 @@ const handleShopSelect = async (shop: Shop) => {
 
                           {lensShopData?.urbanLogistics && (
                             <div className="p-6 bg-emerald-600/5 border border-emerald-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[11px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
+                              <p className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.4em] text-center border-b border-emerald-500/10 pb-4">Urban Logistics</p>
                               <LogisticsRadar logistics={lensShopData.urbanLogistics} />
                               <div className="space-y-3 pt-2">
                                 <LogisticsMetricBar label="Transit" value={lensShopData.urbanLogistics.transitAccessibility} />
@@ -1970,12 +1969,12 @@ const handleShopSelect = async (shop: Shop) => {
                               </div>
                               {lensShopData.urbanLogistics.publicTransportNodes && lensShopData.urbanLogistics.publicTransportNodes.length > 0 && (
                                 <div className="space-y-2 pt-2 border-t border-emerald-500/10">
-                                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
+                                  <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
                                   <div className="flex flex-col gap-1.5">
                                     {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
                                       <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-[11px]">🚌</span>
-                                        <span className="text-[11px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
+                                        <span className="text-10px]">🚌</span>
+                                        <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
                                       </div>
                                     ))}
                                   </div>
@@ -1986,9 +1985,9 @@ const handleShopSelect = async (shop: Shop) => {
 
                           {lensShopData?.predictedFootfall && (
                             <div className="p-6 bg-rose-600/5 border border-rose-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
-                              <p className="text-[11px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
+                              <p className="text-[10px] font-black text-rose-300 uppercase tracking-[0.4em] text-center border-b border-rose-500/10 pb-4">Traffic Intelligence</p>
                               <FootfallChart data={lensShopData.predictedFootfall} />
-                              <p className="text-[10px] text-rose-300/95 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
+                              <p className="text-[8px] text-rose-300/95 uppercase font-black tracking-widest text-center">Temporal Density Analysis</p>
                             </div>
                           )}
                              {lensShopData && (
@@ -2022,7 +2021,7 @@ const handleShopSelect = async (shop: Shop) => {
                         </div>
                       ) : (
                         <div className="py-20 text-center opacity-20">
-                          <p className="text-[11px] font-black uppercase tracking-widest">Lens System Idle.</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest">Lens System Idle.</p>
                         </div>
                       )}
                     </div>
@@ -2032,8 +2031,8 @@ const handleShopSelect = async (shop: Shop) => {
                         <button key={v.id} onClick={() => handleShopSelect(v)} className="w-full p-5 rounded-[2rem] bg-emerald-600/5 border border-emerald-500/20 text-left transition-all hover:bg-emerald-600/10 flex items-center gap-4 animate-in slide-in-from-right-4">
                           <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">{v.emoji}</div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[14px] font-black text-white uppercase truncate">{v.name}</p>
-                            <p className="text-[10px] text-emerald-400 font-black uppercase">Live Signal</p>
+                            <p className="text-[13px] font-black text-white uppercase truncate">{v.name}</p>
+                            <p className="text-[9px] text-emerald-400 font-black uppercase">Live Signal</p>
                           </div>
                         </button>
                       ))}
@@ -2047,16 +2046,16 @@ const handleShopSelect = async (shop: Shop) => {
                       <div className="flex items-center gap-4">
                         <span className="text-3xl bg-white/5 p-3 rounded-2xl border border-white/5 shadow-inner">{p.emoji}</span>
                         <div>
-                          <p className="text-[13px] font-black text-white uppercase leading-none">{p.name}</p>
-                          <p className="text-[11px] text-white/40 font-black uppercase mt-1">{p.cuisine}</p>
+                          <p className="text-[12px] font-black text-white uppercase leading-none">{p.name}</p>
+                          <p className="text-[9px] text-white/40 font-black uppercase mt-1">{p.cuisine}</p>
                         </div>
                       </div>
-                      <button onClick={() => setActiveProfileId(p.id)} className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[10px] font-black uppercase rounded-2xl transition-all shadow-inner">Manage</button>
+                      <button onClick={() => setActiveProfileId(p.id)} className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[9px] font-black uppercase rounded-2xl transition-all shadow-inner">Manage</button>
                     </div>
                   ))}
                   {activeProfileId && (
                     <div className="p-6 bg-indigo-600/5 border border-indigo-500/10 rounded-3xl">
-                       <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest text-center">Node Under Active Management</p>
+                       <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest text-center">Node Under Active Management</p>
                     </div>
                   )}
                 </div>
@@ -2078,8 +2077,8 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="text-center space-y-2">
                   <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter">{activeShop.name}</h2>
                   <div className="flex items-center justify-center gap-3">
-                    <button onClick={() => setChatLang('en-US')} className={`px-4 py-1.5 rounded-xl text-[11px] font-black border transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>English</button>
-                    <button onClick={() => setChatLang('ta-IN')} className={`px-4 py-1.5 rounded-xl text-[11px] font-black border transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>தமிழ்</button>
+                    <button onClick={() => setChatLang('en-US')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>English</button>
+                    <button onClick={() => setChatLang('ta-IN')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>தமிழ்</button>
                   </div>
                 </div>
               </div>
@@ -2090,10 +2089,10 @@ const handleShopSelect = async (shop: Shop) => {
                     {activeShop.menu?.map((item, idx) => (
                       <div key={idx} className={`flex justify-between items-center p-4 md:p-6 bg-white/5 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] hover:bg-white/10 transition-all ${item.isSoldOut ? 'opacity-50 grayscale' : ''}`}>
                         <div className="flex flex-col">
-                          <span className="text-[15px] md:text-[17px] font-black text-white uppercase tracking-tight">
-                            {item.name} {item.isSoldOut && <span className="ml-2 text-[11px] px-2 py-0.5 bg-rose-600 text-white rounded-lg">SOLD OUT</span>}
+                          <span className="text-[14px] md:text-[16px] font-black text-white uppercase tracking-tight">
+                            {item.name} {item.isSoldOut && <span className="ml-2 text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded-lg">SOLD OUT</span>}
                           </span>
-                          <span className="text-[13px] md:text-[14px] font-black text-emerald-400">₹{item.price}</span>
+                          <span className="text-[12px] md:text-[13px] font-black text-emerald-400">₹{item.price}</span>
                         </div>
                         <div className="flex items-center gap-4 md:gap-6">
                           <button onClick={() => updateCart(item.name, -1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>-</button>
@@ -2107,7 +2106,7 @@ const handleShopSelect = async (shop: Shop) => {
                   <div className="space-y-6 bg-black/40 p-6 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border border-white/5 shadow-inner">
                     <div className="flex flex-col items-center gap-4 mb-4">
                        <VoiceWave isActive={isListening || isParsingOrder} isSpeaking={isParsingOrder} />
-                       <p className="text-[12px] font-black text-indigo-400 uppercase tracking-widest text-center">
+                       <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest text-center">
                          {isParsingOrder ? (chatLang === 'ta-IN' ? "முகவர் உங்கள் ஆர்டரை எழுதுகிறார்..." : "Agent is writing down your order...") : 
                           isListening ? (chatLang === 'ta-IN' ? "கேட்கிறது..." : "Listening to Signal...") : 
                           (chatLang === 'ta-IN' ? "உங்கள் ஆர்டரைச் சொல்லுங்கள் (எ.கா. 'biryani rendu venum')" : "State items to ADD via voice (e.g. 'Add 2 Biryanis')")}
@@ -2130,15 +2129,15 @@ const handleShopSelect = async (shop: Shop) => {
                           }
                        }} disabled={isParsingOrder} className={`p-6 md:p-8 rounded-2xl md:rounded-[2rem] transition-all shadow-2xl active:scale-95 border flex flex-col items-center gap-2 min-w-[100px] md:min-w-[120px] ${isListening ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/50' : 'bg-white/5 text-white/40 border-white/10 hover:text-white/80'}`}>
                          <span className="text-2xl md:text-3xl">{isListening ? '⏹️' : '🎤'}</span>
-                         <span className="text-[10px] font-black uppercase">{isListening ? 'REC' : 'MIC'}</span>
+                         <span className="text-[9px] font-black uppercase">{isListening ? 'REC' : 'MIC'}</span>
                        </button>
                        <div className="flex-1 flex flex-col gap-4">
                           <input value={orderInput} onChange={e => setOrderInput(e.target.value)} placeholder={chatLang === 'ta-IN' ? "எ.கா. 2 பிரியாணி..." : "e.g. 2 Biryanis..."} className="w-full bg-black/60 border border-white/10 rounded-2xl md:rounded-[2rem] px-6 md:px-10 py-5 md:py-8 text-lg md:text-xl text-white outline-none focus:border-indigo-500 transition-all shadow-inner placeholder:text-white/10" />
                           <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => processOrderInput()} disabled={isParsingOrder || !orderInput} className="py-4 md:py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[13px] md:text-[15px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30">
+                            <button onClick={() => processOrderInput()} disabled={isParsingOrder || !orderInput} className="py-4 md:py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[12px] md:text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30">
                               {isParsingOrder ? (chatLang === 'ta-IN' ? 'சரிபார்க்கிறது...' : 'Processing...') : (chatLang === 'ta-IN' ? 'பட்டியலில் சேர்' : 'Voice/Text Add')}
                             </button>
-                            <button onClick={proceedToVerify} disabled={isParsingOrder || Object.keys(cart).length === 0} className="py-4 md:py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[13px] md:text-[15px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2">
+                            <button onClick={proceedToVerify} disabled={isParsingOrder || Object.keys(cart).length === 0} className="py-4 md:py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[12px] md:text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2">
                               {chatLang === 'ta-IN' ? `சரிபார்க்கவும் (${cartTotalItems})` : `Finalize (${cartTotalItems})`}
                             </button>
                           </div>
@@ -2157,13 +2156,13 @@ const handleShopSelect = async (shop: Shop) => {
                        </div>
                      ))}
                      <div className="flex justify-between items-center pt-4">
-                        <span className="text-[11px] md:text-[13px] font-black text-indigo-400 uppercase tracking-widest">Grid Energy Total</span>
+                        <span className="text-[10px] md:text-[12px] font-black text-indigo-400 uppercase tracking-widest">Grid Energy Total</span>
                         <span className="text-2xl md:text-4xl font-black text-white">₹{parsedOrder.totalPrice}</span>
                      </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4">
-                      <button onClick={() => setOrderStep('menu')} className="py-5 bg-white/5 text-white/40 uppercase font-black text-[13px] rounded-3xl border border-white/5">Back</button>
-                      <button onClick={confirmFinalOrder} className="py-5 bg-emerald-600 text-white uppercase font-black text-[13px] rounded-3xl shadow-2xl">Place Order</button>
+                      <button onClick={() => setOrderStep('menu')} className="py-5 bg-white/5 text-white/40 uppercase font-black text-[12px] rounded-3xl border border-white/5">Back</button>
+                      <button onClick={confirmFinalOrder} className="py-5 bg-emerald-600 text-white uppercase font-black text-[12px] rounded-3xl shadow-2xl">Place Order</button>
                    </div>
                 </div>
               )}
@@ -2183,7 +2182,7 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex justify-between items-start">
                 <div>
                   <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter">{isEditing ? 'Modify Node Data' : 'Establish Node Signal'}</h2>
-                  <p className="text-[12px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">{isEditing ? 'Updating live manifest' : 'Onboarding legend'}</p>
+                  <p className="text-[11px] text-white/40 font-black uppercase tracking-[0.3em] mt-1">{isEditing ? 'Updating live manifest' : 'Onboarding legend'}</p>
                 </div>
                 <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/60 transition-all hover:rotate-90">✕</button>
               </div>
@@ -2192,45 +2191,45 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="space-y-8">
                   <div className="grid grid-cols-4 gap-6">
                     <div className="col-span-1 space-y-2">
-                      <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Symbol</label>
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Symbol</label>
                       <input value={regForm.emoji} onChange={e => setRegForm({...regForm, emoji: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-4 py-5 text-center text-2xl shadow-inner focus:border-indigo-500 transition-all outline-none text-white" />
                     </div>
                     <div className="col-span-3 space-y-2">
-                      <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Hub Alias</label>
+                      <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Hub Alias</label>
                       <input placeholder="E.g. Murali's Snacks" value={regForm.name} onChange={e => setRegForm({...regForm, name: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[15px] outline-none focus:border-indigo-500 shadow-inner transition-all font-bold text-white placeholder:text-white/30" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Cuisine Specialty</label>
-                    <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[13px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Cuisine Specialty</label>
+                    <input placeholder="E.g. Authentic Rose Milk" value={regForm.cuisine} onChange={e => setRegForm({...regForm, cuisine: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/30" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Manual Coordinates (DMS)</label>
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Manual Coordinates (DMS)</label>
                     <div className="flex gap-2">
-                      <input placeholder={`13°05'41.5"N 80°10'30.2"E`} value={regForm.manualDMS} onChange={e => setRegForm({...regForm, manualDMS: e.target.value})} className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/20" />
-                      <button onClick={handleApplyDMS} className="px-6 bg-white/10 hover:bg-white/20 text-white text-[11px] font-black uppercase rounded-2xl border border-white/10 transition-all">Apply</button>
+                      <input placeholder={`13°05'41.5"N 80°10'30.2"E`} value={regForm.manualDMS} onChange={e => setRegForm({...regForm, manualDMS: e.target.value})} className="flex-1 bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[11px] shadow-inner focus:border-indigo-500 outline-none transition-all text-white placeholder:text-white/20" />
+                      <button onClick={handleApplyDMS} className="px-6 bg-white/10 hover:bg-white/20 text-white text-[9px] font-black uppercase rounded-2xl border border-white/10 transition-all">Apply</button>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
-                      <label className="text-[11px] font-black uppercase text-indigo-400">Broadcast Bio</label>
-                      <button onClick={generateBio} disabled={isGeneratingBio} className="text-[11px] font-black uppercase text-indigo-300 hover:text-indigo-200 transition-all flex items-center gap-2">{isGeneratingBio ? '...' : '✨ Gemini Bio'}</button>
+                      <label className="text-[9px] font-black uppercase text-indigo-400">Broadcast Bio</label>
+                      <button onClick={generateBio} disabled={isGeneratingBio} className="text-[9px] font-black uppercase text-indigo-300 hover:text-indigo-200 transition-all flex items-center gap-2">{isGeneratingBio ? '...' : '✨ Gemini Bio'}</button>
                     </div>
-                    <textarea rows={4} value={regForm.description} onChange={e => setRegForm({...regForm, description: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[13px] resize-none focus:border-indigo-500 outline-none transition-all leading-relaxed text-white placeholder:text-white/30" />
+                    <textarea rows={4} value={regForm.description} onChange={e => setRegForm({...regForm, description: e.target.value})} className="w-full bg-white/10 border border-white/10 rounded-2xl px-6 py-5 text-[12px] resize-none focus:border-indigo-500 outline-none transition-all leading-relaxed text-white placeholder:text-white/30" />
                   </div>
                 </div>
                 <div className="flex flex-col h-full space-y-8">
                   <div className="space-y-4 flex-1">
-                    <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Inventory Manifest (Menu)</label>
+                    <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Inventory Manifest (Menu)</label>
                     <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-6 min-h-[200px] flex flex-col gap-3 custom-scrollbar overflow-y-auto max-h-[350px]">
                       {regForm.menu.map((item, idx) => (
                         <div key={idx} className={`flex justify-between items-center bg-white/10 p-4 rounded-2xl group animate-in slide-in-from-left-2 transition-all ${item.isSoldOut ? 'border-rose-500/50' : 'border-transparent'}`}>
                           <div className="flex flex-col">
-                            <span className={`text-[13px] font-black uppercase tracking-tight ${item.isSoldOut ? 'text-slate-500 line-through' : 'text-white'}`}>{item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span></span>
-                            {item.isSoldOut && <span className="text-[10px] font-black text-rose-500 uppercase">OFF-SHELF</span>}
+                            <span className={`text-[12px] font-black uppercase tracking-tight ${item.isSoldOut ? 'text-slate-500 line-through' : 'text-white'}`}>{item.name} <span className="text-emerald-400 ml-2">₹{item.price}</span></span>
+                            {item.isSoldOut && <span className="text-[8px] font-black text-rose-500 uppercase">OFF-SHELF</span>}
                           </div>
                           <div className="flex items-center gap-3">
-                            <button onClick={() => toggleMenuItemSoldOut(idx)} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${item.isSoldOut ? 'bg-rose-600 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}>
+                            <button onClick={() => toggleMenuItemSoldOut(idx)} className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${item.isSoldOut ? 'bg-rose-600 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}>
                               {item.isSoldOut ? 'Restock' : 'Sold Out'}
                             </button>
                             <button onClick={() => removeMenuItem(idx)} className="text-white/20 group-hover:text-rose-500 p-1 transition-colors">✕</button>
@@ -2241,16 +2240,16 @@ const handleShopSelect = async (shop: Shop) => {
                   </div>
                   <div className="space-y-4 bg-white/10 p-6 rounded-[2.5rem] border border-white/5 shadow-inner">
                     <div className="grid grid-cols-3 gap-3">
-                      <input placeholder="Item" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[13px] text-white outline-none" />
-                      <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[13px] text-white outline-none" />
+                      <input placeholder="Item" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none" />
+                      <input placeholder="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-[12px] text-white outline-none" />
                     </div>
-                    <button onClick={addMenuItem} className="w-full py-4 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[11px] font-black uppercase rounded-xl transition-all shadow-lg">+ Add to Manifest</button>
+                    <button onClick={addMenuItem} className="w-full py-4 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white text-[10px] font-black uppercase rounded-xl transition-all shadow-lg">+ Add to Manifest</button>
                   </div>
                 </div>
               </div>
               <div className="pt-10 flex flex-col sm:flex-row gap-6 border-t border-white/5">
-                <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="flex-1 py-6 text-[13px] font-black uppercase text-white/40 bg-white/10 rounded-2xl transition-all hover:bg-white/20">Cancel</button>
-                <button onClick={handleSaveHub} className="flex-1 py-6 text-[13px] font-black uppercase text-white bg-indigo-600 rounded-2xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">Activate Partner Node</button>
+                <button onClick={() => { setIsRegistering(false); setIsEditing(false); }} className="flex-1 py-6 text-[12px] font-black uppercase text-white/40 bg-white/10 rounded-2xl transition-all hover:bg-white/20">Cancel</button>
+                <button onClick={handleSaveHub} className="flex-1 py-6 text-[12px] font-black uppercase text-white bg-indigo-600 rounded-2xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20">Activate Partner Node</button>
               </div>
             </div>
           </div>
@@ -2265,11 +2264,11 @@ const handleShopSelect = async (shop: Shop) => {
               </div>
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Alias</label>
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Alias</label>
                   <input value={reviewForm.author} onChange={e => setReviewForm({...reviewForm, author: e.target.value})} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Rating</label>
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Rating</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4, 5].map(star => (
                       <button key={star} onClick={() => setReviewForm({...reviewForm, rating: star})} className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all ${reviewForm.rating >= star ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/30' : 'bg-white/5 text-white/20'}`}>
@@ -2279,10 +2278,10 @@ const handleShopSelect = async (shop: Shop) => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase text-indigo-400 px-1">Commentary</label>
+                  <label className="text-[9px] font-black uppercase text-indigo-400 px-1">Commentary</label>
                   <textarea rows={4} value={reviewForm.comment} onChange={e => setReviewForm({...reviewForm, comment: e.target.value})} placeholder="Shared knowledge regarding flavor profile..." className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white outline-none focus:border-indigo-500 resize-none" />
                 </div>
-                <button onClick={handleSaveReview} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[13px] shadow-2xl shadow-indigo-600/20 transition-all active:scale-95">Commit Review</button>
+                <button onClick={handleSaveReview} className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase text-[12px] shadow-2xl shadow-indigo-600/20 transition-all active:scale-95">Commit Review</button>
               </div>
             </div>
           </div>
@@ -2310,7 +2309,7 @@ const handleShopSelect = async (shop: Shop) => {
                 <div className="flex justify-between items-start gap-4 min-w-0">
                   <div className="space-y-1 min-w-0 flex-1">
                     <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight truncate leading-tight">{activeShop.name}</h3>
-                    <p className="text-[10px] md:text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] truncate">{activeShop.cuisine}</p>
+                    <p className="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] truncate">{activeShop.cuisine}</p>
                   </div>
                   <div className="shrink-0 pt-1">
                     <VoiceWave isActive={isVoiceActive} isSpeaking={isSpeaking} onStop={stopAudio} />
@@ -2323,37 +2322,37 @@ const handleShopSelect = async (shop: Shop) => {
                       <p className="text-xs md:text-sm text-white/80 leading-relaxed italic">"{activeShop.description}"</p>
                       {footfallPrediction && (
                         <div className="bg-indigo-600/10 border border-indigo-500/20 p-3 md:p-4 rounded-2xl">
-                          <p className="text-[10px] md:text-[11px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
-                          <p className="text-[11px] md:text-[12px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
+                          <p className="text-[7px] md:text-[8px] font-black uppercase text-indigo-400/60 mb-1 tracking-widest">Predictive Footfall engine</p>
+                          <p className="text-[10px] md:text-[11px] font-bold text-slate-100 italic">"{footfallPrediction}"</p>
                         </div>
                       )}
                     </div>
                     <div className="bg-white/5 border border-white/5 rounded-3xl p-4 space-y-2">
-                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Breakdown Index</p>
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Breakdown Index</p>
                       <SuccessReasoningChart shop={activeShop} />
                     </div>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex justify-between items-center sticky top-0 bg-black/10 backdrop-blur-md py-1">
-                      <p className="text-[11px] font-black text-white uppercase tracking-[0.3em]">Field Intelligence ({activeShop.reviews?.length || 0})</p>
-                      <button onClick={() => setIsReviewing(true)} className="text-[11px] font-black text-amber-500 uppercase hover:text-amber-400 transition-colors">+ Add Review</button>
+                      <p className="text-[8px] font-black text-white uppercase tracking-[0.3em]">Field Intelligence ({activeShop.reviews?.length || 0})</p>
+                      <button onClick={() => setIsReviewing(true)} className="text-[8px] font-black text-amber-500 uppercase hover:text-amber-400 transition-colors">+ Add Review</button>
                     </div>
                     <div className="space-y-3">
                       {activeShop.reviews && activeShop.reviews.length > 0 ? (
                         activeShop.reviews.map((rev, i) => (
                           <div key={rev.id} className="bg-white/5 border border-white/5 p-3 rounded-2xl space-y-1.5 animate-in slide-in-from-right-4 duration-300">
                             <div className="flex justify-between items-center">
-                              <span className="text-[11px] font-black text-white uppercase">{rev.author}</span>
-                              <span className="text-[11px] text-amber-500">{'⭐'.repeat(rev.rating)}</span>
+                              <span className="text-[9px] font-black text-white uppercase">{rev.author}</span>
+                              <span className="text-[9px] text-amber-500">{'⭐'.repeat(rev.rating)}</span>
                             </div>
-                            <p className="text-[12px] text-slate-400 italic">"{rev.comment}"</p>
-                            <p className="text-[10px] text-slate-600 uppercase font-black text-right">{rev.timestamp}</p>
+                            <p className="text-[10px] text-slate-400 italic">"{rev.comment}"</p>
+                            <p className="text-[7px] text-slate-600 uppercase font-black text-right">{rev.timestamp}</p>
                           </div>
                         ))
                       ) : (
                         <div className="py-4 border border-dashed border-white/5 rounded-2xl text-center opacity-30">
-                          <p className="text-[11px] font-black uppercase tracking-widest">No exploration logs yet.</p>
+                          <p className="text-[9px] font-black uppercase tracking-widest">No exploration logs yet.</p>
                         </div>
                       )}
                     </div>
@@ -2361,9 +2360,9 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/5 mt-auto shrink-0">
-                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[11px] md:text-[12px] font-black uppercase rounded-2xl shadow-2xl text-center active:scale-95 transition-transform">🛰️ Navigate</a>
+                  <a href={`https://www.google.com/maps/dir/?api=1&destination=${activeShop.coords.lat},${activeShop.coords.lng}`} target="_blank" className="px-6 py-4 bg-white text-black text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl text-center active:scale-95 transition-transform">🛰️ Navigate</a>
                   {activeShop.isVendor && activeShop.status === VendorStatus.ONLINE && (
-                    <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[11px] md:text-[12px] font-black uppercase rounded-2xl shadow-2xl active:scale-95 transition-transform border border-emerald-400/20">🛒 Order Now</button>
+                    <button onClick={initiateOrder} className="flex-1 py-4 bg-emerald-600 text-white text-[10px] md:text-[11px] font-black uppercase rounded-2xl shadow-2xl active:scale-95 transition-transform border border-emerald-400/20">🛒 Order Now</button>
                   )}
                 </div>
               </div>
@@ -2381,19 +2380,19 @@ const handleShopSelect = async (shop: Shop) => {
             <div className="w-full h-full bg-[#080808]/98 backdrop-blur-3xl border border-white/10 rounded-[3rem] md:rounded-[4rem] flex flex-col overflow-hidden shadow-[0_60px_180px_rgba(0,0,0,1)] animate-in zoom-in-95 duration-500 border-t-white/20">
               <div className="p-8 md:p-12 bg-white/5 border-b border-white/5 flex justify-between items-center shrink-0">
                 <div className="flex flex-col">
-                  <h3 className="text-[13px] md:text-[15px] font-black text-white tracking-[0.4em] uppercase">gStrEats Voice</h3>
-                  <p className="hidden md:block text-[11px] font-black text-indigo-400 uppercase tracking-widest mt-2 opacity-60">Spatial Reasoning Engine</p>
+                  <h3 className="text-[12px] md:text-[14px] font-black text-white tracking-[0.4em] uppercase">gStrEats Voice</h3>
+                  <p className="hidden md:block text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-2 opacity-60">Spatial Reasoning Engine</p>
                 </div>
                 <div className="bg-black/50 p-1.5 md:p-2 rounded-2xl flex border border-white/10 shadow-inner mr-4">
-                  <button onClick={() => setChatLang('en-US')} className={`px-4 md:px-5 py-1.5 md:py-2 text-[11px] font-black rounded-xl transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 text-white' : 'text-white/20 hover:text-white/40'}`}>EN</button>
-                  <button onClick={() => setChatLang('ta-IN')} className={`px-4 md:px-5 py-1.5 md:py-2 text-[11px] font-black rounded-xl transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 text-white' : 'text-white/20 hover:text-white/40'}`}>TA</button>
+                  <button onClick={() => setChatLang('en-US')} className={`px-4 md:px-5 py-1.5 md:py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 text-white' : 'text-white/20 hover:text-white/40'}`}>EN</button>
+                  <button onClick={() => setChatLang('ta-IN')} className={`px-4 md:px-5 py-1.5 md:py-2 text-[10px] font-black rounded-xl transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 text-white' : 'text-white/20 hover:text-white/40'}`}>TA</button>
                 </div>
                 <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/60 p-2 transition-all">✕</button>
               </div>
               <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-8 md:space-y-10 custom-scrollbar">
                 {chatHistory.map(m => (
                   <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                    <div className={`max-w-[92%] p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] text-[15px] md:text-[16px] font-bold leading-relaxed shadow-2xl flex flex-col gap-3 ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
+                    <div className={`max-w-[92%] p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] text-[14px] md:text-[15px] font-bold leading-relaxed shadow-2xl flex flex-col gap-3 ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
                       {m.isThinking ? <p className="animate-pulse">Thinking...</p> : <p>{m.text}</p>}
                       {m.sources && m.sources.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10 mt-1">
@@ -2403,10 +2402,10 @@ const handleShopSelect = async (shop: Shop) => {
                               href={src.uri} 
                               target="_blank" 
                               rel="noopener noreferrer" 
-                              className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-black uppercase text-indigo-300 transition-all hover:scale-105 active:scale-95"
+                              className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[9px] font-black uppercase text-indigo-300 transition-all hover:scale-105 active:scale-95"
                             >
                               <span>{src.title}</span>
-                              <span className="text-[11px]">↗</span>
+                              <span className="text-[10px]">↗</span>
                             </a>
                           ))}
                         </div>
@@ -2426,7 +2425,7 @@ const handleShopSelect = async (shop: Shop) => {
                   </button>
                   <form onSubmit={(e) => { e.preventDefault(); handleChatSubmit(chatInput); }} className="flex-1 flex gap-3 md:gap-4">
                     <input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Query grid..." className="flex-1 bg-white/10 border border-white/10 rounded-2xl md:rounded-3xl px-5 md:px-8 py-4 md:py-6 text-sm md:text-base text-white outline-none focus:border-indigo-500 shadow-inner" />
-                    <button type="submit" className="px-6 md:px-12 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl md:rounded-3xl font-black text-[13px] md:text-[15px] uppercase shadow-lg transition-all active:scale-95">Send</button>
+                    <button type="submit" className="px-6 md:px-12 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl md:rounded-3xl font-black text-[12px] md:text-[14px] uppercase shadow-lg transition-all active:scale-95">Send</button>
                   </form>
                 </div>
               </div>
