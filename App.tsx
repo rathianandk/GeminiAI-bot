@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import FoodMap from './components/Map';
@@ -15,7 +16,8 @@ import {
   parseOrderAgent,
   predictFootfallAgent,
   analyzeFoodImage,
-  fetchLocalWeather
+  fetchLocalWeather,
+  initializeQueueAgent
 } from './services/geminiService';
 import { 
   Shop, 
@@ -707,7 +709,7 @@ export default function App() {
   const [isLensAnalyzing, setIsLensAnalyzing] = useState(false);
   const [lensTargetName, setLensTargetName] = useState<string>('');
   const [lensAnalysis, setLensAnalysis] = useState<LensAnalysis | null>(null);
-  const [lensTab, setLensTab] = useState<'observations' | 'extractedFrames' | 'synthesis'>('extractedFrames');
+  const [lensTab, setLensTab] = useState<'observations' | 'synthesis'>('observations');
 
   const [flavorHistory, setFlavorHistory] = useState<FlavorGenealogy | null>(null);
   const [isHistoryMining, setIsHistoryMining] = useState(false);
@@ -731,6 +733,7 @@ export default function App() {
   const [parsedOrder, setParsedOrder] = useState<{ orderItems: any[], totalPrice: number } | null>(null);
   const [isParsingOrder, setIsParsingOrder] = useState(false);
   const [cart, setCart] = useState<Record<string, number>>({});
+  const [queueData, setQueueData] = useState<any | null>(null);
 
   const [myProfiles, setMyProfiles] = useState<VendorProfile[]>(() => {
     const saved = localStorage.getItem('geomind_profiles');
@@ -1057,12 +1060,12 @@ const handleShopSelect = async (shop: Shop) => {
     setIsLensAnalyzing(true);
     setExplorerTab('lens');
     setLensAnalysis(null);
-    setLensTab('extractedFrames');
+    setLensTab('observations');
     addLog('Lens', `Performing intensive visual scrape for ${shop.name}...`, 'processing');
     try {
       const analysis = await spatialLensAnalysis(shop.coords, shop.name);
       setLensAnalysis(analysis);
-      addLog('Lens', `Visual frames analysis complete. Urban integration nodes identified.`, 'resolved');
+      addLog('Lens', `Spatial analysis complete. Urban integration nodes identified.`, 'resolved');
     } catch (err) {
       addLog('Healing', `Visual node interference detected for ${shop.name}. Synthetic reconstruction in progress...`, 'failed');
       setIsLensAnalyzing(false);
@@ -1365,7 +1368,6 @@ const handleShopSelect = async (shop: Shop) => {
 
   const liveVendors = shops.filter(s => s.isVendor && s.status === VendorStatus.ONLINE);
   const discoveredShops = shops.filter(s => s.id.startsWith('sync') || s.id.startsWith('seed'));
-  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
   
   const cartValues = Object.values(cart) as number[];
   const cartTotalItems: number = cartValues.reduce((a: number, b: number) => a + b, 0);
@@ -1380,6 +1382,7 @@ const handleShopSelect = async (shop: Shop) => {
     setParsedOrder(null);
     setCart({}); 
     setIsOrdering(true);
+    setQueueData(null);
   };
 
   const updateCart = (itemName: string, delta: number) => {
@@ -1449,17 +1452,31 @@ const handleShopSelect = async (shop: Shop) => {
     setOrderStep('verifying');
   };
 
-  const confirmFinalOrder = () => {
+  const confirmFinalOrder = async () => {
     setOrderStep('placed');
-    addLog('Spatial', `Order transmitted successfully to ${activeShop?.name}. Signal locked.`, 'resolved');
-    setTimeout(() => {
-      setIsOrdering(false);
-      setParsedOrder(null);
-      setOrderInput('');
-      setCart({});
-      setActiveShop(null); 
-    }, 4000);
+    const orderItems = (Object.entries(cart) as [string, number][]).map(([name, quantity]) => ({ 
+      name, 
+      quantity, 
+      price: activeShop?.menu?.find(m => m.name === name)?.price || 0 
+    }));
+    
+    addLog('Spatial', 'Processing virtual queue via Order Management Engine...', 'processing');
+    try {
+      const res = await initializeQueueAgent(orderItems, activeShop?.name || 'Local Vendor');
+      setQueueData(res);
+      addLog('Linguistic', `Queue Assigned: ${res.queueStatus.queueID}. Pager Active.`, 'resolved');
+    } catch (e) {
+      addLog('Healing', 'Queue initialization failure. Falling back to analog pager...', 'failed');
+      const rand = Math.floor(Math.random() * 999);
+      setQueueData({
+        queueStatus: { queueID: `Q-${rand}`, position: 1 },
+        hapticConfiguration: { type: "ANALOG_PAGER", pattern: [1000] },
+        textNotification: `Your virtual queue ID is Q-${rand}. Wait for your turn.`
+      });
+    }
   };
+
+  const isCurrentlyLive = activeProfileId && shops.some(s => s.id === `live-${activeProfileId}` && s.status === VendorStatus.ONLINE);
 
   return (
     <div className="flex h-screen w-screen bg-[#020202] text-slate-300 font-mono overflow-hidden selection:bg-indigo-500/30">
@@ -1468,6 +1485,8 @@ const handleShopSelect = async (shop: Shop) => {
         @keyframes siri-liquid-alt { 0% { border-radius: 30% 70% 70% 30% / 50% 60% 30% 60%; transform: rotate(360deg) scale(1.1); } 50% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: rotate(180deg) scale(0.9); } 100% { border-radius: 30% 70% 70% 30% / 50% 60% 30% 60%; transform: rotate(0deg) scale(1.1); } }
         @keyframes scan { 0% { top: -10%; opacity: 0; } 50% { opacity: 1; } 100% { top: 110%; opacity: 0; } }
         @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes pager-pulse { 0% { box-shadow: 0 0 10px rgba(225, 29, 72, 0.4); } 50% { box-shadow: 0 0 30px rgba(225, 29, 72, 0.8); } 100% { box-shadow: 0 0 10px rgba(225, 29, 72, 0.4); } }
+        .animate-pager-pulse { animation: pager-pulse 1.5s infinite; }
         .animate-siri-liquid { animation: siri-liquid 8s linear infinite; }
         .animate-siri-liquid-alt { animation: siri-liquid-alt 12s ease-in-out infinite; }
         .animate-scan { animation: scan 2s linear infinite; }
@@ -1693,7 +1712,7 @@ const handleShopSelect = async (shop: Shop) => {
                       </div>
                       <div className="relative pl-10 space-y-12">
                         <div className="absolute left-3 top-2 bottom-2 w-1 bg-gradient-to-b from-amber-400 via-amber-400/40 to-transparent rounded-full"></div>
-                        {flavorHistory.timeline.map((era, i) => (
+                        {flavorHistory.timeline?.map((era, i) => (
                           <div key={i} className="relative group">
                             <div className="absolute -left-10 top-1.5 w-7 h-7 bg-amber-950 border-4 border-amber-400 rounded-full z-10 shadow-[0_0_15px_rgba(245,158,11,0.8)]"></div>
                             <div className="space-y-4">
@@ -1704,7 +1723,7 @@ const handleShopSelect = async (shop: Shop) => {
                                 <div className="space-y-3">
                                   <p className="text-[9px] font-black text-amber-300 uppercase tracking-widest">Notable Staples</p>
                                   <div className="flex flex-wrap gap-2.5">
-                                    {era.popularItems.map((item, j) => (
+                                    {era.popularItems?.map((item, j) => (
                                       <span key={j} className="text-[9px] px-3 py-1.5 rounded-xl bg-amber-400 text-black font-black uppercase">
                                         {item}
                                       </span>
@@ -1816,7 +1835,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
                                     <div className="grid grid-cols-1 gap-3">
-                                      {analytics.cuisineDistribution.map((c, i) => (
+                                      {analytics.cuisineDistribution?.map((c, i) => (
                                         <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl space-y-2">
                                           <div className="flex justify-between items-center text-[11px] font-black uppercase">
                                             <span className="text-white">{c.label}</span>
@@ -1832,11 +1851,11 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
-                                      {analytics.priceSpectrum.map((p, i) => (
+                                      {analytics.priceSpectrum?.map((p, i) => (
                                         <div key={i} className="p-5 bg-white/5 border border-white/5 rounded-[2rem] space-y-3">
                                           <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">{p.range}</h4>
                                           <div className="flex flex-wrap gap-2">
-                                            {p.nodes.map((node, j) => (
+                                            {p.nodes?.map((node, j) => (
                                               <span key={j} className="text-[9px] px-3 py-1 bg-white/5 border border-white/10 text-white/60 rounded-lg">{node}</span>
                                             ))}
                                           </div>
@@ -1847,8 +1866,8 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
                                     <div className="space-y-4">
-                                      {analytics.legendaryIndex.map((l, i) => (
-                                        <div key={i} className="p-5 bg-indigo-600/5 border border-indigo-500/20 rounded-[2rem] space-y-2 transition-all hover:bg-indigo-600/10">
+                                      {analytics.legendaryIndex?.map((l, i) => (
+                                        <div key={i} className="p-5 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-2 transition-all hover:bg-indigo-600/10">
                                           <div className="flex justify-between items-center">
                                             <span className="text-[13px] font-black text-white uppercase tracking-tight">{l.name}</span>
                                             <span className="text-[14px] font-black text-indigo-400">{l.score}</span>
@@ -1861,7 +1880,7 @@ const handleShopSelect = async (shop: Shop) => {
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
                                     <div className="grid grid-cols-1 gap-3">
-                                      {analytics.customerSegmentation.map((s, i) => (
+                                      {analytics.customerSegmentation?.map((s, i) => (
                                         <div key={i} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center gap-4">
                                           <div className="w-10 h-10 shrink-0 bg-white/10 rounded-xl flex items-center justify-center font-black text-white text-[10px]">{s.volume}%</div>
                                           <div className="flex-1 min-w-0">
@@ -1907,6 +1926,11 @@ const handleShopSelect = async (shop: Shop) => {
                            {lensTargetName || "Select a Food Node"}
                          </h4>
                       </div>
+
+                      <div className="flex bg-[#0a0a0a] p-1.5 rounded-2xl border border-white/5 shadow-inner">
+                        <button onClick={() => setLensTab('observations')} className={`flex-1 py-3 text-[9px] font-black uppercase rounded-xl transition-all ${lensTab === 'observations' ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/30 hover:text-white/50'}`}>Observations</button>
+                      </div>
+
                       {isLensAnalyzing ? (
                         <div className="flex-1 flex flex-col items-center justify-center space-y-6 animate-in fade-in duration-500">
                           <div className="relative w-40 h-40 bg-indigo-600/5 rounded-3xl border border-indigo-500/20 overflow-hidden group">
@@ -1922,16 +1946,18 @@ const handleShopSelect = async (shop: Shop) => {
                         </div>
                       ) : lensAnalysis ? (
                         <div className="space-y-8 overflow-y-auto custom-scrollbar pb-10">
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
-                            {lensAnalysis.observations.map((obs, i) => (
-                              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
-                                <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
-                                <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
-                                <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
-                              </div>
-                            ))}
-                          </div>
+                          {lensTab === 'observations' && (
+                            <div className="space-y-4">
+                              <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] px-2">Spatial Observations</p>
+                              {lensAnalysis.observations?.map((obs, i) => (
+                                <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2 animate-in slide-in-from-left-4 duration-300">
+                                  <span className={`text-[7px] font-black px-2 py-0.5 rounded uppercase ${obs.type === 'bottleneck' ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-400'}`}>{obs.type}</span>
+                                  <h5 className="text-[11px] font-black text-white uppercase leading-relaxed tracking-tight">{obs.detail}</h5>
+                                  <p className="text-[9px] text-slate-400 leading-relaxed italic border-l border-indigo-500/30 pl-3">"{obs.causalBottleneck}"</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
 
                           {lensShopData?.safetyMetrics && (
                             <div className="p-6 bg-indigo-600/5 border border-indigo-500/20 rounded-[2.5rem] space-y-6 animate-in fade-in duration-700">
@@ -1942,19 +1968,6 @@ const handleShopSelect = async (shop: Shop) => {
                                 <SafetyMetricBar label="Police" value={lensShopData.safetyMetrics.policeProximity} />
                                 <SafetyMetricBar label="Lighting" value={lensShopData.safetyMetrics.lighting} />
                               </div>
-                              {lensShopData.safetyMetrics.nearestPoliceStations && lensShopData.safetyMetrics.nearestPoliceStations.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-indigo-500/10">
-                                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">Nearest Police Precincts</p>
-                                  <div className="flex flex-col gap-1.5">
-                                    {lensShopData.safetyMetrics.nearestPoliceStations.map((station, i) => (
-                                      <div key={i} className="px-3 py-2 bg-indigo-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-10px]">👮</span>
-                                        <span className="text-[10px] font-black text-indigo-300 uppercase tracking-tight">{station}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           )}
 
@@ -1967,19 +1980,6 @@ const handleShopSelect = async (shop: Shop) => {
                                 <LogisticsMetricBar label="Walkability" value={lensShopData.urbanLogistics.walkabilityScore} />
                                 <LogisticsMetricBar label="Parking" value={lensShopData.urbanLogistics.parkingAvailability} />
                               </div>
-                              {lensShopData.urbanLogistics.publicTransportNodes && lensShopData.urbanLogistics.publicTransportNodes.length > 0 && (
-                                <div className="space-y-2 pt-2 border-t border-emerald-500/10">
-                                  <p className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Nearby Transport Nodes</p>
-                                  <div className="flex flex-col gap-1.5">
-                                    {lensShopData.urbanLogistics.publicTransportNodes.map((node, i) => (
-                                      <div key={i} className="px-3 py-2 bg-emerald-500/10 rounded-xl border border-indigo-500/10 flex items-center gap-2">
-                                        <span className="text-10px]">🚌</span>
-                                        <span className="text-[10px] font-black text-emerald-300 uppercase tracking-tight">{node}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           )}
 
@@ -1996,24 +1996,24 @@ const handleShopSelect = async (shop: Shop) => {
             weather={weather}
             metrics={{
               safetyScore: Math.round(
-                (lensShopData.safetyMetrics.crimeSafety + 
-                 lensShopData.safetyMetrics.policeProximity + 
-                 lensShopData.safetyMetrics.lighting) / 3
+                ((lensShopData.safetyMetrics?.crimeSafety || 70) + 
+                 (lensShopData.safetyMetrics?.policeProximity || 70) + 
+                 (lensShopData.safetyMetrics?.lighting || 70)) / 3
               ),
               logisticsScore: Math.round(
-                (lensShopData.urbanLogistics.transitAccessibility + 
-                 lensShopData.urbanLogistics.walkabilityScore + 
-                 lensShopData.urbanLogistics.parkingAvailability) / 3
+                ((lensShopData.urbanLogistics?.transitAccessibility || 50) + 
+                 (lensShopData.urbanLogistics?.walkabilityScore || 50) + 
+                 (lensShopData.urbanLogistics?.parkingAvailability || 50)) / 3
               ),
               successScore: Math.round(
-                (lensShopData.successReasoning.locationGravity + 
-                 lensShopData.successReasoning.flavorMoat + 
-                 lensShopData.successReasoning.socialResonance + 
-                 lensShopData.successReasoning.economicFit) / 4
+                ((lensShopData.successReasoning?.locationGravity || 70) + 
+                 (lensShopData.successReasoning?.flavorMoat || 70) + 
+                 (lensShopData.successReasoning?.socialResonance || 70) + 
+                 (lensShopData.successReasoning?.economicFit || 70)) / 4
               ),
               footfallScore: Math.round(
-                lensShopData.predictedFootfall.reduce((sum, period) => sum + period.volume, 0) / 
-                lensShopData.predictedFootfall.length
+                (lensShopData.predictedFootfall || []).reduce((sum, period) => sum + period.volume, 0) / 
+                (lensShopData.predictedFootfall?.length || 1)
               )
             }}
           />
@@ -2025,7 +2025,7 @@ const handleShopSelect = async (shop: Shop) => {
                         </div>
                       )}
                     </div>
-                  ) : explorerTab === 'live_vendors' ? (
+                  ) : liveVendors.length > 0 ? (
                     <div className="space-y-6">
                       {liveVendors.map((v, i) => (
                         <button key={v.id} onClick={() => handleShopSelect(v)} className="w-full p-5 rounded-[2rem] bg-emerald-600/5 border border-emerald-500/20 text-left transition-all hover:bg-emerald-600/10 flex items-center gap-4 animate-in slide-in-from-right-4">
@@ -2053,11 +2053,6 @@ const handleShopSelect = async (shop: Shop) => {
                       <button onClick={() => setActiveProfileId(p.id)} className="px-6 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[9px] font-black uppercase rounded-2xl transition-all shadow-inner">Manage</button>
                     </div>
                   ))}
-                  {activeProfileId && (
-                    <div className="p-6 bg-indigo-600/5 border border-indigo-500/10 rounded-3xl">
-                       <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest text-center">Node Under Active Management</p>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -2071,11 +2066,11 @@ const handleShopSelect = async (shop: Shop) => {
         {isOrdering && activeShop && (
           <div className="fixed inset-0 z-[7000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-500">
             <div className="max-w-3xl w-full bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] md:rounded-[4rem] p-6 md:p-16 space-y-8 md:space-y-12 shadow-2xl relative overflow-y-auto max-h-[95vh] custom-scrollbar">
-              <button onClick={() => setIsOrdering(false)} className="absolute top-6 right-6 md:top-12 md:right-12 text-2xl text-white/40 hover:text-white p-2 transition-colors">✕</button>
-              <div className="flex flex-col items-center gap-4 md:gap-6">
-                <div className="w-16 h-16 md:w-24 md:h-24 bg-white/5 rounded-2xl md:rounded-[2rem] flex items-center justify-center text-3xl md:text-5xl border border-white/10">{activeShop.emoji}</div>
+              <button onClick={() => setIsOrdering(false)} className="absolute top-12 right-12 text-2xl text-white/40 hover:text-white p-2 transition-colors">✕</button>
+              <div className="flex flex-col items-center gap-6">
+                <div className="w-24 h-24 bg-white/5 rounded-[2rem] flex items-center justify-center text-5xl border border-white/10">{activeShop.emoji}</div>
                 <div className="text-center space-y-2">
-                  <h2 className="text-2xl md:text-4xl font-black text-white uppercase tracking-tighter">{activeShop.name}</h2>
+                  <h2 className="text-4xl font-black text-white uppercase tracking-tighter">{activeShop.name}</h2>
                   <div className="flex items-center justify-center gap-3">
                     <button onClick={() => setChatLang('en-US')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'en-US' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>English</button>
                     <button onClick={() => setChatLang('ta-IN')} className={`px-4 py-1.5 rounded-xl text-[10px] font-black border transition-all ${chatLang === 'ta-IN' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg' : 'bg-white/5 border-white/10 text-white/40'}`}>தமிழ்</button>
@@ -2084,26 +2079,26 @@ const handleShopSelect = async (shop: Shop) => {
               </div>
               
               {orderStep === 'menu' && (
-                <div className="space-y-8 md:space-y-12 animate-in fade-in duration-500">
-                  <div className="grid grid-cols-1 gap-3 md:gap-4 max-h-[300px] md:max-h-[400px] overflow-y-auto custom-scrollbar pr-2 md:pr-4">
+                <div className="space-y-12 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-4">
                     {activeShop.menu?.map((item, idx) => (
-                      <div key={idx} className={`flex justify-between items-center p-4 md:p-6 bg-white/5 border border-white/5 rounded-[1.5rem] md:rounded-[2rem] hover:bg-white/10 transition-all ${item.isSoldOut ? 'opacity-50 grayscale' : ''}`}>
+                      <div key={idx} className={`flex justify-between items-center p-6 bg-white/5 border border-white/5 rounded-[2rem] hover:bg-white/10 transition-all ${item.isSoldOut ? 'opacity-50 grayscale' : ''}`}>
                         <div className="flex flex-col">
-                          <span className="text-[14px] md:text-[16px] font-black text-white uppercase tracking-tight">
+                          <span className="text-[16px] font-black text-white uppercase tracking-tight">
                             {item.name} {item.isSoldOut && <span className="ml-2 text-[10px] px-2 py-0.5 bg-rose-600 text-white rounded-lg">SOLD OUT</span>}
                           </span>
-                          <span className="text-[12px] md:text-[13px] font-black text-emerald-400">₹{item.price}</span>
+                          <span className="text-[13px] font-black text-emerald-400">₹{item.price}</span>
                         </div>
-                        <div className="flex items-center gap-4 md:gap-6">
-                          <button onClick={() => updateCart(item.name, -1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>-</button>
-                          <span className={`text-lg md:text-xl font-black w-6 md:w-8 text-center ${cart[item.name] ? 'text-indigo-400' : 'text-white/20'}`}>{cart[item.name] || 0}</span>
-                          <button onClick={() => updateCart(item.name, 1)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>+</button>
+                        <div className="flex items-center gap-6">
+                          <button onClick={() => updateCart(item.name, -1)} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>-</button>
+                          <span className={`text-xl font-black w-8 text-center ${cart[item.name] ? 'text-indigo-400' : 'text-white/20'}`}>{cart[item.name] || 0}</span>
+                          <button onClick={() => updateCart(item.name, 1)} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white active:scale-90" disabled={item.isSoldOut}>+</button>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="space-y-6 bg-black/40 p-6 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border border-white/5 shadow-inner">
+                  <div className="space-y-6 bg-black/40 p-10 rounded-[3rem] border border-white/5 shadow-inner">
                     <div className="flex flex-col items-center gap-4 mb-4">
                        <VoiceWave isActive={isListening || isParsingOrder} isSpeaking={isParsingOrder} />
                        <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest text-center">
@@ -2127,17 +2122,17 @@ const handleShopSelect = async (shop: Shop) => {
                             };
                             r.start();
                           }
-                       }} disabled={isParsingOrder} className={`p-6 md:p-8 rounded-2xl md:rounded-[2rem] transition-all shadow-2xl active:scale-95 border flex flex-col items-center gap-2 min-w-[100px] md:min-w-[120px] ${isListening ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/50' : 'bg-white/5 text-white/40 border-white/10 hover:text-white/80'}`}>
-                         <span className="text-2xl md:text-3xl">{isListening ? '⏹️' : '🎤'}</span>
+                       }} disabled={isParsingOrder} className={`p-8 rounded-[2rem] transition-all shadow-2xl active:scale-95 border flex flex-col items-center gap-2 min-w-[120px] ${isListening ? 'bg-rose-600 text-white border-rose-500 shadow-rose-600/50' : 'bg-white/5 text-white/40 border-white/10 hover:text-white/80'}`}>
+                         <span className="text-3xl">{isListening ? '⏹️' : '🎤'}</span>
                          <span className="text-[9px] font-black uppercase">{isListening ? 'REC' : 'MIC'}</span>
                        </button>
                        <div className="flex-1 flex flex-col gap-4">
-                          <input value={orderInput} onChange={e => setOrderInput(e.target.value)} placeholder={chatLang === 'ta-IN' ? "எ.கா. 2 பிரியாணி..." : "e.g. 2 Biryanis..."} className="w-full bg-black/60 border border-white/10 rounded-2xl md:rounded-[2rem] px-6 md:px-10 py-5 md:py-8 text-lg md:text-xl text-white outline-none focus:border-indigo-500 transition-all shadow-inner placeholder:text-white/10" />
+                          <input value={orderInput} onChange={e => setOrderInput(e.target.value)} placeholder={chatLang === 'ta-IN' ? "எ.கா. 2 பிரியாணி..." : "e.g. 2 Biryanis..."} className="w-full bg-black/60 border border-white/10 rounded-[2rem] px-10 py-8 text-xl text-white outline-none focus:border-indigo-500 transition-all shadow-inner placeholder:text-white/10" />
                           <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => processOrderInput()} disabled={isParsingOrder || !orderInput} className="py-4 md:py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[12px] md:text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30">
+                            <button onClick={() => processOrderInput()} disabled={isParsingOrder || !orderInput} className="py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30">
                               {isParsingOrder ? (chatLang === 'ta-IN' ? 'சரிபார்க்கிறது...' : 'Processing...') : (chatLang === 'ta-IN' ? 'பட்டியலில் சேர்' : 'Voice/Text Add')}
                             </button>
-                            <button onClick={proceedToVerify} disabled={isParsingOrder || Object.keys(cart).length === 0} className="py-4 md:py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.25rem] md:rounded-[1.5rem] font-black text-[12px] md:text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2">
+                            <button onClick={proceedToVerify} disabled={isParsingOrder || Object.keys(cart).length === 0} className="py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.5rem] font-black text-[14px] uppercase shadow-2xl transition-all active:scale-[0.98] disabled:opacity-30 flex items-center justify-center gap-2">
                               {chatLang === 'ta-IN' ? `சரிபார்க்கவும் (${cartTotalItems})` : `Finalize (${cartTotalItems})`}
                             </button>
                           </div>
@@ -2148,16 +2143,16 @@ const handleShopSelect = async (shop: Shop) => {
               )}
               {orderStep === 'verifying' && parsedOrder && (
                 <div className="space-y-8 animate-in slide-in-from-bottom-4">
-                   <div className="bg-white/5 p-6 md:p-10 rounded-[2rem] border border-white/10 space-y-6">
-                     {parsedOrder.orderItems.map((it: any, i: number) => (
+                   <div className="bg-white/5 p-10 rounded-[2rem] border border-white/10 space-y-6">
+                     {parsedOrder.orderItems?.map((it: any, i: number) => (
                        <div key={i} className="flex justify-between items-center border-b border-white/5 pb-4">
-                         <span className="text-white font-black uppercase text-sm md:text-base">{it.quantity}x {it.name}</span>
+                         <span className="text-white font-black uppercase">{it.quantity}x {it.name}</span>
                          <span className="text-slate-400 tabular-nums font-bold">₹{it.price * it.quantity}</span>
                        </div>
                      ))}
                      <div className="flex justify-between items-center pt-4">
-                        <span className="text-[10px] md:text-[12px] font-black text-indigo-400 uppercase tracking-widest">Grid Energy Total</span>
-                        <span className="text-2xl md:text-4xl font-black text-white">₹{parsedOrder.totalPrice}</span>
+                        <span className="text-[12px] font-black text-indigo-400 uppercase tracking-widest">Grid Energy Total</span>
+                        <span className="text-4xl font-black text-white">₹{parsedOrder.totalPrice}</span>
                      </div>
                    </div>
                    <div className="grid grid-cols-2 gap-4">
@@ -2167,9 +2162,34 @@ const handleShopSelect = async (shop: Shop) => {
                 </div>
               )}
               {orderStep === 'placed' && (
-                <div className="py-24 flex flex-col items-center justify-center space-y-12 animate-in zoom-in-95">
-                   <div className="w-32 h-32 md:w-40 md:h-40 bg-emerald-600 rounded-full flex items-center justify-center text-6xl md:text-8xl text-white animate-bounce shadow-[0_0_80px_rgba(16,185,129,0.5)]">✓</div>
-                   <h3 className="text-3xl md:text-5xl font-black text-white uppercase text-center tracking-tighter">Order Transmitted</h3>
+                <div className="py-12 flex flex-col items-center justify-center space-y-12 animate-in zoom-in-95">
+                   {queueData ? (
+                     <div className="flex flex-col items-center gap-8 animate-in fade-in duration-700">
+                        <div className="w-64 h-80 bg-[#121212] border-4 border-rose-600 rounded-[3.5rem] p-12 flex flex-col items-center justify-center animate-pager-pulse shadow-[0_0_50px_rgba(225,29,72,0.4)] relative overflow-hidden">
+                          <div className="absolute top-8 left-0 right-0 h-1 bg-rose-600/20"></div>
+                          <p className="text-[10px] font-black text-rose-500 uppercase mb-4 tracking-[0.3em]">Virtual Pager Active</p>
+                          <div className="flex flex-col items-center">
+                            <p className="text-6xl font-black text-white tracking-tighter mb-2">{queueData.queueStatus?.queueID}</p>
+                            <p className="text-[11px] font-bold text-rose-400/60 uppercase tracking-widest">Position #{queueData.queueStatus?.position}</p>
+                          </div>
+                          <div className="mt-8 space-y-1">
+                             <p className="text-[8px] font-black text-white/40 uppercase tracking-widest text-center">Haptic Feed</p>
+                             <div className="flex gap-1.5 justify-center">
+                               {queueData.hapticConfiguration?.pattern?.slice(0, 5).map((_: any, i: number) => (
+                                 <div key={i} className="h-1 w-6 bg-rose-600/30 rounded-full animate-pulse" style={{ animationDelay: `${i * 200}ms` }}></div>
+                               ))}
+                             </div>
+                          </div>
+                        </div>
+                        <p className="text-xl font-bold text-white italic text-center max-w-sm">"{queueData.textNotification}"</p>
+                        <button onClick={() => setIsOrdering(false)} className="px-12 py-5 bg-white/5 border border-white/10 rounded-full uppercase font-black text-xs transition-all hover:bg-white/10 active:scale-95">Exit Pager Mode</button>
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center gap-6">
+                        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-indigo-400 font-black uppercase tracking-widest animate-pulse">Initializing Virtual Queue...</p>
+                     </div>
+                   )}
                 </div>
               )}
             </div>

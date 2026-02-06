@@ -119,14 +119,6 @@ export interface LensObservation {
   causalBottleneck: string;
 }
 
-export interface LensFrame {
-  id: string;
-  timestamp: string;
-  description: string;
-  category: 'Landscape' | 'Sidewalk' | 'Boundary' | 'Perspective';
-  spatialInsight: string;
-}
-
 export interface FoodAnalysis {
   name: string;
   protein: string;
@@ -141,7 +133,6 @@ export interface FoodAnalysis {
 
 export interface LensAnalysis {
   observations: LensObservation[];
-  extractedFrames: LensFrame[];
   recommendation: string;
   videoSource: string;
   foodAnalysis?: FoodAnalysis;
