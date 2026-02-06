@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import FoodMap from './components/Map';
@@ -875,13 +874,10 @@ export default function App() {
   };
 
   const updateShopsWithResult = (result: any) => {
-    // FIX: Additive logic. Merges result.shops with existing shops state using a functional update
-    // Also deduplicates by ID to prevent ghosting on the map.
     setShops(prevShops => {
         const existingIds = new Set(prevShops.map(s => s.id));
         const uniqueFreshShops = (result.shops || []).filter((s: Shop) => !existingIds.has(s.id));
         const updated = [...prevShops, ...uniqueFreshShops];
-        // Ensure analytics are recalculated based on the new cumulative dataset
         computeAnalytics(updated);
         return updated;
     });
@@ -992,6 +988,7 @@ export default function App() {
         menu: profile.menu,
         youtubeLink: profile.youtubeLink,
         reviews: profile.reviews || [],
+        hygieneScore: profile.hygieneScore || 85,
         successReasoning: profile.successReasoning || { locationGravity: 80, flavorMoat: 80, socialResonance: 80, economicFit: 80 },
         safetyMetrics: profile.safetyMetrics || { crimeSafety: 70, policeProximity: 70, footfallIntensity: 70, lighting: 70, vibe: 70, nearestPoliceStations: [] },
         urbanLogistics: profile.urbanLogistics || { transitAccessibility: 50, walkabilityScore: 50, parkingAvailability: 50, publicTransportNodes: [] },
@@ -1344,7 +1341,6 @@ const handleShopSelect = async (shop: Shop) => {
        setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: res.text, sources: res.sources, isThinking: false } : m));
     } catch (e) {
        setChatHistory(prev => prev.map(m => m.isThinking ? { ...m, text: "Grid interference detected. Initiating cognitive self-healing...", isThinking: false } : m));
-       // The retry is handled at the service level, but we provide UI feedback here
        const res = await spatialChatAgent(i, location);
        setChatHistory(prev => prev.map(m => m.id === (nowTs + 1).toString() ? { ...m, text: res.text, sources: res.sources } : m));
     }
@@ -1679,9 +1675,7 @@ const handleShopSelect = async (shop: Shop) => {
                             </div>
                           </div>
                         )}
-
                         <p className="text-[9px] text-amber-300 font-bold italic mt-2 animate-pulse">* Nutritional data is an AI estimate for educational purposes</p>
-
                         <div className="flex flex-wrap gap-2 pt-2">
                           {imageFlavorAnalysis.history_tags.map((tag, i) => (
                             <span key={i} className="text-[8px] px-3 py-1.5 bg-amber-500/10 text-amber-300 font-black uppercase rounded-xl border border-amber-500/20">#{tag}</span>
@@ -1819,7 +1813,6 @@ const handleShopSelect = async (shop: Shop) => {
                                     <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sector Synthesis</p>
                                     <p className="text-[11px] font-bold text-slate-100 leading-relaxed italic">"{analytics.sectorSummary}"</p>
                                   </div>
-
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Flavor Variance</p>
                                     <div className="grid grid-cols-1 gap-3">
@@ -1836,7 +1829,6 @@ const handleShopSelect = async (shop: Shop) => {
                                       ))}
                                     </div>
                                   </div>
-
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Economic Zoning</p>
                                     <div className="grid grid-cols-1 gap-4">
@@ -1852,7 +1844,6 @@ const handleShopSelect = async (shop: Shop) => {
                                       ))}
                                     </div>
                                   </div>
-
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Legendary Calibration</p>
                                     <div className="space-y-4">
@@ -1867,7 +1858,6 @@ const handleShopSelect = async (shop: Shop) => {
                                       ))}
                                     </div>
                                   </div>
-
                                   <div className="space-y-4">
                                     <p className="text-[10px] font-black text-white uppercase tracking-[0.3em] px-2">Grid Demographics</p>
                                     <div className="grid grid-cols-1 gap-3">
@@ -2337,8 +2327,6 @@ const handleShopSelect = async (shop: Shop) => {
                         </div>
                       )}
                     </div>
-                    
-                    {/* Success Reasoning Chart for Every Vendor Location */}
                     <div className="bg-white/5 border border-white/5 rounded-3xl p-4 space-y-2">
                       <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] text-center mb-1">Success Breakdown Index</p>
                       <SuccessReasoningChart shop={activeShop} />
@@ -2404,8 +2392,24 @@ const handleShopSelect = async (shop: Shop) => {
               <div className="flex-1 overflow-y-auto p-8 md:p-12 space-y-8 md:space-y-10 custom-scrollbar">
                 {chatHistory.map(m => (
                   <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                    <div className={`max-w-[92%] p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] text-[14px] md:text-[15px] font-bold leading-relaxed shadow-2xl ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
+                    <div className={`max-w-[92%] p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] text-[14px] md:text-[15px] font-bold leading-relaxed shadow-2xl flex flex-col gap-3 ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white/10 text-white border border-white/10 rounded-bl-none shadow-black/40'}`}>
                       {m.isThinking ? <p className="animate-pulse">Thinking...</p> : <p>{m.text}</p>}
+                      {m.sources && m.sources.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10 mt-1">
+                          {m.sources.map((src, idx) => (
+                            <a 
+                              key={idx} 
+                              href={src.uri} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[9px] font-black uppercase text-indigo-300 transition-all hover:scale-105 active:scale-95"
+                            >
+                              <span>{src.title}</span>
+                              <span className="text-[10px]">↗</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
