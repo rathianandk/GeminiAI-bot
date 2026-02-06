@@ -231,13 +231,13 @@ const AgentCoordinationScene: React.FC<AgentCoordinationSceneProps> = ({ activeA
       ref={containerRef} 
       className="w-full h-[240px] bg-indigo-950/10 rounded-3xl border border-white/10 relative overflow-hidden mb-4 shadow-inner group"
     >
-      <div className="absolute top-3 left-4 text-[9px] font-black text-indigo-300 uppercase tracking-[0.5em] z-10 drop-shadow-[0_0_8px_rgba(165,180,252,0.4)]">
+      <div className="absolute top-3 left-4 text-[11px] font-black text-indigo-300 uppercase tracking-[0.5em] z-10 drop-shadow-[0_0_8px_rgba(165,180,252,0.4)]">
         Neural Coordination Mesh
       </div>
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-indigo-500/10 to-transparent"></div>
       
       <div className="absolute bottom-3 left-0 right-0 text-center z-10 transition-opacity duration-500">
-        <span className={`inline-block bg-indigo-600/20 text-indigo-400 px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest border border-indigo-500/20 shadow-lg backdrop-blur-md transition-all ${activeAgent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+        <span className={`inline-block bg-indigo-600/20 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20 shadow-lg backdrop-blur-md transition-all ${activeAgent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
           {activeAgent ? `Signal: Supervisor Invoked ${activeAgent}` : 'Grid Standby'}
         </span>
       </div>
