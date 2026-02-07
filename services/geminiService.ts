@@ -117,7 +117,7 @@ export const predictFootfallAgent = async (shop: Shop, location: LatLng) => {
 export const discoveryAgent = async (query: string, location: LatLng) => {
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
-    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 10 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
+    contents: `SPATIAL DISCOVERY MISSION: Identify approximately 25 real, legendary street food spots, iconic eateries, and hidden culinary gems within a 5km radius of the coordinates: Latitude ${location.lat}, Longitude ${location.lng}. 
     
     INSTRUCTIONS:
     1. Use Google Search to find high-accuracy, real-world data about food spots near this location.
@@ -127,7 +127,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
        - flavorMoat: Score (0-100) based on dish uniqueness.
        - socialResonance: Score (0-100) based on local legend status.
        - economicFit: Score (0-100) based on neighborhood demographic match.
-    4. SAFETY & LOGISTICS: Identify the nearest 1 police stations and nearest 1 public transport nodes.
+    4. SAFETY & LOGISTICS: Identify the nearest 3 police stations and nearest 3 public transport nodes.
     5. FOOTFALL PREDICTION: Predicted volume (0-100) for 5 time windows.
     
     REQUIRED JSON STRUCTURE (Output ONLY this raw JSON object):
@@ -142,7 +142,7 @@ export const discoveryAgent = async (query: string, location: LatLng) => {
           "description": "Story", 
           "address": "Address",
           "successReasoning": { "locationGravity": 85, "flavorMoat": 90, "socialResonance": 75, "economicFit": 80 },
-          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe": 95, "nearestPoliceStations": ["Name 1"] },
+          "safetyMetrics": { "crimeSafety": 85, "policeProximity": 70, "footfallIntensity": 90, "lighting": 80, "vibe: 95, "nearestPoliceStations": ["Name 1"] },
           "urbanLogistics": { "transitAccessibility": 90, "walkabilityScore": 85, "parkingAvailability": 40, "publicTransportNodes": ["Stop A"] },
           "predictedFootfall": [ {"period": "6am-10am", "volume": 40}, {"period": "11am-2pm", "volume": 85}, {"period": "3pm-6pm", "volume": 55}, {"period": "7pm-10pm", "volume": 95}, {"period": "11pm-2am", "volume": 20} ]
         }
